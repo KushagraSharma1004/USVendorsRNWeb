@@ -1,6 +1,6 @@
 {
-    "name": "US Customers",
-    "short_name": "US Customers",
+    "name": "US Vendors",
+    "short_name": "US Vendors",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#2874F0",

@@ -4,70 +4,43 @@ import { useAuth } from './context/AuthContext'
 import TextInputComponent from './components/TextInput'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import Loader from './components/Loader.jsx'
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { doc, getDoc} from 'firebase/firestore'
 import { db } from '@/firebase'
-import { decryptData, encryptData } from './context/hashing.js'
 
 const Login = () => {
   const router = useRouter()
-  const { setCustomerMobileNumber, setCustomerPassword, setCustomerFullData } = useAuth()
+  const { setVendorMobileNumber, setVendorPassword, setVendorFullData } = useAuth()
   const params = useLocalSearchParams();
-  const customerMobileNumberFromURL = params.customerMobileNumber || ''
-  const customerPasswordFromURL = params.customerPassword || ''
-  const [customerMobileNumber, setCustomerMobileNumberThisScreen] = useState('')
+  const vendorMobileNumberFromURL = params.vendorMobileNumber || ''
+  const vendorPasswordFromURL = params.vendorPassword || ''
+  const [vendorMobileNumber, setVendorMobileNumberThisScreen] = useState('')
   const [isCommonLoaderVisible, setIsCommonLoaderVisible] = useState(false)
-  const [customerPassword, setCustomerPasswordThisScreen] = useState('')
+  const [vendorPassword, setVendorPasswordThisScreen] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
-  const registerInVendor = decryptData(localStorage.getItem('registerInVendor')) || ''
-  const oldMethod_FromQR = params.fromQR === 'true' ? true : false
-  const oldMethod_VendorMobileNumberFromQR = params.vendorMobileNumberFromQR || ''
-  const customerMobileNumberFromVendor = params.customerMobileNumberFromVendor || ''
-  const vendorMobileNumberForComingInCustomer = params.vendorMobileNumberForComingInCustomer || ''
-  const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
-    setIsMounted(true)
-  }, [])
-
-  useEffect(() => {
-    if (customerMobileNumberFromURL && customerMobileNumberFromURL.length === 10) {
-      setCustomerMobileNumberThisScreen(customerMobileNumberFromURL);
+    if (vendorMobileNumberFromURL && vendorMobileNumberFromURL.length === 10) {
+      setVendorMobileNumberThisScreen(vendorMobileNumberFromURL);
     }
-    if (customerPasswordFromURL && customerPasswordFromURL.length > 0) {
-      setCustomerPasswordThisScreen(customerPasswordFromURL)
+    if (vendorPasswordFromURL && vendorPasswordFromURL.length > 0) {
+      setVendorPasswordThisScreen(vendorPasswordFromURL)
     }
-  }, [customerMobileNumberFromURL, customerPasswordFromURL]);
-
-  useEffect(() => {
-    if(oldMethod_FromQR && decryptData(oldMethod_VendorMobileNumberFromQR).length === 10){
-      router.replace(`/Vendors/?vendor=${encodeURIComponent(oldMethod_VendorMobileNumberFromQR)}&fromQR=true`)
-      return
-    }
-  }, [oldMethod_FromQR, oldMethod_VendorMobileNumberFromQR])
-
-  useEffect(() => {
-    if(!isMounted) return
-    if(decryptData(customerMobileNumberFromVendor).length === 10 && decryptData(vendorMobileNumberForComingInCustomer).length === 10){
-      localStorage.setItem('customerMobileNumber', encodeURIComponent(customerMobileNumberFromVendor))
-      setCustomerMobileNumber(decryptData(customerMobileNumberFromVendor))
-      router.replace(`/Vendors/?vendor=${encodeURIComponent(vendorMobileNumberForComingInCustomer)}&isVendorVisiting=${encodeURIComponent(encryptData('true'))}`)
-    }
-  }, [customerMobileNumberFromVendor, vendorMobileNumberForComingInCustomer, isMounted])
+  }, [vendorMobileNumberFromURL, vendorPasswordFromURL]);
 
   const validateForm = () => {
-    const isMobileNumberValid = customerMobileNumber.length === 10;
-    const isPasswordValid = customerPassword.length > 0;
+    const isMobileNumberValid = vendorMobileNumber.length === 10;
+    const isPasswordValid = vendorPassword.length > 0;
     return (
       isMobileNumberValid && isPasswordValid
     );
   }
 
   const handleLoginPress = async () => {
-    if (customerMobileNumber.length !== 10) {
+    if (vendorMobileNumber.length !== 10) {
       setErrorMessage('Invalid Mobile Number')
       return;
     }
-    if (customerPassword.length === 0) {
+    if (vendorPassword.length === 0) {
       setErrorMessage('Invalid Password')
       return;
     }
@@ -75,62 +48,29 @@ const Login = () => {
     setErrorMessage('')
     try {
       setIsCommonLoaderVisible(true)
-      const customerRef = doc(db, 'customers', customerMobileNumber)
-      const customerDoc = await getDoc(customerRef)
-      const customerData = customerDoc.data()
-      if (!customerDoc.exists()) {
+      const vendorRef = doc(db, 'users', vendorMobileNumber)
+      const vendorDoc = await getDoc(vendorRef)
+      const vendorData = vendorDoc.data()
+      if (!vendorDoc.exists()) {
         setErrorMessage('Mobile number not found. Please Register.')
         return
       }
 
-      if(customerData.customerPassword !== customerPassword){
+      if(vendorData.vendorPassword !== vendorPassword){
         setErrorMessage('Incorrect password, Please try again.')
         return;
       }
 
-      if(!customerData.customerName){
+      if(!vendorData.vendorName){
         setErrorMessage('Please complete the registration.')
-        router.push(`/SignUp/?customerMobileNumber=${customerMobileNumber}`)
+        router.push(`/SignUp/?vendorMobileNumber=${vendorMobileNumber}`)
         return;
       }
 
-      await setCustomerFullData(customerData)
+      await setVendorFullData(vendorData)
 
-      await setCustomerMobileNumber(customerMobileNumber)
-      await setCustomerPassword(customerPassword)
-      if(registerInVendor && registerInVendor.length === 10){
-        const handleAddVendorToMyVendorList = async () => {
-          try {
-            const customerInVendorRef = doc(db, 'customers', customerMobileNumber, 'vendors', registerInVendor)
-            const vendorInCustomerRef = doc(db, 'users', registerInVendor, 'customers', registerInVendor)
-            const customerInVendorDocSnap = await getDoc(customerInVendorRef)
-            const vendorInCustomerDocSnap = await getDoc(vendorInCustomerRef)
-            if(!customerInVendorDocSnap.exists() || !vendorInCustomerDocSnap.exists()) {
-              await setDoc(customerInVendorRef, {
-                addedAt: serverTimestamp(),
-                vendorMobileNumber: registerInVendor
-              })
-
-              await setDoc(vendorInCustomerRef, {
-                addedAt: serverTimestamp(),
-                customerMobileNumber
-              })
-              
-              localStorage.removeItem('registerInVendor')
-              router.push(`/Vendors/?vendor=${encodeURIComponent(encryptData(registerInVendor))}`)
-            } else {
-              localStorage.removeItem('registerInVendor')
-              router.push(`/Vendors/?vendor=${encodeURIComponent(encryptData(registerInVendor))}`)
-            }
-          } catch (error) {
-            console.log('Error adding vendor to vendor list: ', error)
-            alert('Could not add vendor to vendor list. Please try again.')
-          }
-        }
-        await handleAddVendorToMyVendorList()
-        // router.push(`/(tabs)/Vendors/?vendor=${encodeURIComponent(encryptData(registerInVendor))}`)
-        return
-      }
+      await setVendorMobileNumber(vendorMobileNumber)
+      await setVendorPassword(vendorPassword)
       router.push('/(tabs)/Home')
     } catch (error) {
       setErrorMessage(error.message)
@@ -143,7 +83,7 @@ const Login = () => {
     <View className='flex flex-1 bg-primary items-center justify-center gap-2' >
       {isCommonLoaderVisible && <Loader />}
       <Image style={{ height: 100, width: 100 }} source={require('../assets/images/icon.png')}></Image>
-      <Text className='text-white text-2xl font-bold text-center'>Customer Login</Text>
+      <Text className='text-white text-2xl font-bold text-center'>Vendor Login</Text>
       <View className='bg-white rounded-[10px] p-5 w-[93%] max-w-md items-center justify-center gap-2 flex-col'>
         <View className='h-[70px] w-[70px] p-5 bg-primary rounded-full items-center justify-center' >
           <Image style={{ height: 35, width: 35 }} source={require('../assets/images/userImage.png')} />
@@ -152,15 +92,15 @@ const Login = () => {
         <TextInputComponent
           placeholder='Mobile Number'
           keyboardType='number-pad'
-          value={customerMobileNumber}
-          onChangeText={setCustomerMobileNumberThisScreen}
+          value={vendorMobileNumber}
+          onChangeText={setVendorMobileNumberThisScreen}
           maxLength={10}
         />
 
         <TextInputComponent
           placeholder='Password'
-          value={customerPassword}
-          onChangeText={setCustomerPasswordThisScreen}
+          value={vendorPassword}
+          onChangeText={setVendorPasswordThisScreen}
           secureTextEntry={true}
         />
 
@@ -189,11 +129,11 @@ const Login = () => {
                   style={{ height: 30, width: 30 }}
                 />
               </TouchableOpacity>
-              <Text className='text-center text-[18px]' ><Text className='font-bold text-[20px] color-primary' >{customerMobileNumber}</Text> is not registered.</Text>
+              <Text className='text-center text-[18px]' ><Text className='font-bold text-[20px] color-primary' >{vendorMobileNumber}</Text> is not registered.</Text>
               <Text className='text-center text-[18px]' >Do you want to Register it?</Text>
 
               <TouchableOpacity onPress={() => {
-                router.push(`/SignUp/?customerMobileNumber=${customerMobileNumber}`)
+                router.push(`/SignUp/?vendorMobileNumber=${vendorMobileNumber}`)
                 setErrorMessage('')
               }} className='w-[80%] rounded-[10px] p-[10px] bg-primary mt-[50px]' ><Text className='text-white text-center text-[18px]' >Yes</Text></TouchableOpacity>
             </View>

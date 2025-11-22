@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "USCustomers",
-    "slug": "USCustomers",
+    "name": "USVendors",
+    "slug": "USVendors",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "uscustomers",
+    "scheme": "usvendors",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -29,8 +29,8 @@
       "favicon": "favicon.png",
       "baseUrl": "/",
       "manifest": {
-        "name": "USCustomers",
-        "short_name": "USCustomers",
+        "name": "USVendors",
+        "short_name": "USVendors",
         "start_url": "./",
         "display": "standalone",
         "background_color": "#E6F4FE",

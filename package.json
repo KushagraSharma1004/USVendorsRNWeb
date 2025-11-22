@@ -1,8 +1,8 @@
 {
-  "name": "uscustomers",
+  "name": "usvendors",
   "main": "expo-router/entry",
   "version": "1.0.0",
-  "homepage": "https://www.customers.unoshops.com",
+  "homepage": "https://www.vendors.unoshops.com",
   "scripts": {
     "dev": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
@@ -14,7 +14,7 @@
     "add-favicon": "node ./scripts/add-favicon.js",
     "predeploy": "npm run build && npm run fix-paths && npm run add-cname && npm run add-favicon",
     "fix-paths": "sed -i '' 's|=\"/_expo/|=\"./_expo/|g' dist/index.html",
-    "add-cname": "echo 'customers.unoshops.com' > dist/CNAME && touch dist/.nojekyll",
+    "add-cname": "echo 'vendors.unoshops.com' > dist/CNAME && touch dist/.nojekyll",
     "deploy": "gh-pages -d dist --dotfiles"
   },
   "dependencies": {

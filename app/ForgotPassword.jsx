@@ -9,13 +9,13 @@ import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 
 const ForgotPassword = () => {
   const router = useRouter()
-  const [customerMobileNumber, setCustomerMobileNumber] = useState('')
+  const [vendorMobileNumber, setVendorMobileNumber] = useState('')
   const [confirmationResult, setConfirmationResult] = useState(null)
   const [isCommonLoaderVisible, setIsCommonLoaderVisible] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [otp, setOtp] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
-  const [isCustomerAllowedToSetNewPassword, setIsCustomerAllowedToSetNewPassword] = useState(false)
+  const [isVendorAllowedToSetNewPassword, setIsVendorAllowedToSetNewPassword] = useState(false)
   const [newPassword, setNewPassword] = useState('')
 
   const setupRecaptcha = () => {
@@ -35,22 +35,22 @@ const ForgotPassword = () => {
   const handleSendOTP = async () => {
     setIsCommonLoaderVisible(true)
     try {
-      if (customerMobileNumber.length !== 10) {
+      if (vendorMobileNumber.length !== 10) {
         setErrorMessage('Please enter a valid 10 digit mobile number.')
         return;
       }
 
-      const customerRef = doc(db, 'customers', customerMobileNumber);
-      const customerDoc = await getDoc(customerRef);
+      const vendorRef = doc(db, 'users', vendorMobileNumber);
+      const vendorDoc = await getDoc(vendorRef);
 
-      if (!customerDoc.exists()) {
-        setErrorMessage(`'${customerMobileNumber}' is not registered.`)
+      if (!vendorDoc.exists()) {
+        setErrorMessage(`'${vendorMobileNumber}' is not registered.`)
         return;
       }
 
       setupRecaptcha();
       const appVerifier = window.recaptchaVerifier;
-      const confirmation = await signInWithPhoneNumber(auth, `+91${customerMobileNumber}`, appVerifier);
+      const confirmation = await signInWithPhoneNumber(auth, `+91${vendorMobileNumber}`, appVerifier);
       setConfirmationResult(confirmation);
 
       setIsCommonLoaderVisible(false)
@@ -78,7 +78,7 @@ const ForgotPassword = () => {
     try {
       setIsCommonLoaderVisible(true)
       await confirmationResult.confirm(otp);
-      setIsCustomerAllowedToSetNewPassword(true)
+      setIsVendorAllowedToSetNewPassword(true)
       setSuccessMessage('✅ Phone verified! Registration complete.');
       setErrorMessage('')
       setConfirmationResult(null);
@@ -93,14 +93,14 @@ const ForgotPassword = () => {
   const handleChangePassword = async () => {
     try{
       setIsCommonLoaderVisible(true)
-    const customerRef = doc(db, 'customers', customerMobileNumber)
+    const vendorRef = doc(db, 'users', vendorMobileNumber)
 
-    updateDoc(customerRef, {
-      customerPassword: newPassword
+    updateDoc(vendorRef, {
+      vendorPassword: newPassword
     })
-    router.replace(`/Login/?customerMobileNumber=${customerMobileNumber}&customerPassword=${newPassword}`)
-    setCustomerMobileNumber('')
-    setIsCustomerAllowedToSetNewPassword(false)
+    router.replace(`/Login/?vendorMobileNumber=${vendorMobileNumber}&vendorPassword=${newPassword}`)
+    setVendorMobileNumber('')
+    setIsVendorAllowedToSetNewPassword(false)
     setNewPassword('')
     setIsCommonLoaderVisible(false)
   } catch (error) {
@@ -116,9 +116,9 @@ const ForgotPassword = () => {
       <View id="recaptcha-container" style={{ zIndex: 10 }} />
       {isCommonLoaderVisible && <Loader></Loader>}
       <Text className='text-white text-2xl font-bold text-center'>Reset Password</Text>
-      {!confirmationResult && isCustomerAllowedToSetNewPassword === false &&
+      {!confirmationResult && isVendorAllowedToSetNewPassword === false &&
         <View className='bg-white rounded-[10px] p-5 w-[93%] max-w-md items-center justify-center gap-[5px] flex-col min-h-[30%]'>
-          <TextInputComponent placeholder='Mobile Number' keyboardType='numeric' value={customerMobileNumber} onChangeText={setCustomerMobileNumber} maxLength={10} />
+          <TextInputComponent placeholder='Mobile Number' keyboardType='numeric' value={vendorMobileNumber} onChangeText={setVendorMobileNumber} maxLength={10} />
           {errorMessage && <View className='w-full border-red-400 border-2 rounded-[10px] p-2 mt-2 bg-red-300' >
             <Text className='text-[15px] text-white font-semibold text-center'>{errorMessage}</Text>
           </View>}
@@ -128,14 +128,14 @@ const ForgotPassword = () => {
       {confirmationResult &&
         <View className='bg-white rounded-[10px] p-5 w-[93%] max-w-md items-center justify-center gap-[5px] flex-col min-h-[30%]'>
           <TextInputComponent placeholder='6-Digit OTP' keyboardType='numeric' value={otp} onChangeText={setOtp} maxLength={6} />
-          <Text className='text-center font-bold text-primaryGreen text-[12px]' >An OTP is sent to your device - {customerMobileNumber}</Text>
+          <Text className='text-center font-bold text-primaryGreen text-[12px]' >An OTP is sent to your device - {vendorMobileNumber}</Text>
           {errorMessage && <View className='w-full border-red-400 border-2 rounded-[10px] p-2 mt-2 bg-red-300' >
             <Text className='text-[15px] text-white font-semibold text-center'>{errorMessage}</Text>
           </View>}
           <TouchableOpacity onPress={confirmCode} className='bg-primary w-full rounded-[10px] p-3 items-center justify-center' ><Text className='text-white text-lg font-semibold' >Confirm OTP</Text></TouchableOpacity>
         </View>
       }
-      {isCustomerAllowedToSetNewPassword &&
+      {isVendorAllowedToSetNewPassword &&
         <View className='bg-white rounded-[10px] p-5 w-[93%] max-w-md items-center justify-center gap-[5px] flex-col min-h-[30%]'>
           <TextInputComponent placeholder='Enter New password' keyboardType='numeric' value={newPassword} onChangeText={setNewPassword} />
           {errorMessage && <View className='w-full border-red-400 border-2 rounded-[10px] p-2 mt-2 bg-red-300' >
