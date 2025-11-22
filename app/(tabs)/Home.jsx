@@ -60,7 +60,6 @@ export default function Home() {
       })).sort((a, b) => (a.position || 0) - (b.position || 0));
 
       setCategories(vendorCategoriesData);
-      setOriginalCategoriesOrder([...vendorCategoriesData]);
     } catch (error) {
       console.log('Error fetching categories: ', error);
     }
@@ -136,7 +135,7 @@ export default function Home() {
       setNewVariantStock('');
       setAddNewVariantSectionVisibleFor(null);
 
-      alert('Success', 'Variant added successfully!');
+      alert('Variant added successfully!');
 
     } catch (error) {
       console.error("Error adding variant: ", error);
@@ -219,7 +218,7 @@ export default function Home() {
       fetchVendorItemsList()
 
       // Success & Reset
-      alert('Success', 'New item added successfully!');
+      alert('New item added successfully!');
 
       // Reset form
       setNewItemName('');
