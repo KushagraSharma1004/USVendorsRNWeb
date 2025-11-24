@@ -37,6 +37,10 @@ export default function Home() {
   const [isBulkEditingLoaderVisible, setIsBulkEditingLoaderVisible] = useState(false)
   const [addNewItemSectionVisibleFor, setAddNewItemSectionVisibleFor] = useState(null)
   const [newItemName, setNewItemName] = useState('')
+  const [editingField, setEditingField] = useState(null);
+  const [pendingChanges, setPendingChanges] = useState({});
+  const [showSaveAlert, setShowSaveAlert] = useState(false);
+  const [nextEditField, setNextEditField] = useState(null);
 
   const fetchVendorItemsList = async () => {
     try {
@@ -90,7 +94,7 @@ export default function Home() {
     if (!baseItem) return;
 
     // Check for duplicate variant name
-    const variantExists = baseItem.variants?.some(
+    const variantExists = baseItem?.variants?.some(
       v => v.variantName?.toLowerCase().trimEnd() === newVariantName.toLowerCase().trimEnd()
     );
 
@@ -237,6 +241,211 @@ export default function Home() {
       setIsBulkEditingLoaderVisible(false);
     }
   };
+
+  const handleSaveField = async (itemId, variantId, fieldName, newValue) => {
+    setIsBulkEditingLoaderVisible(true);
+    try {
+      const itemRef = doc(db, 'users', vendorMobileNumber, 'list', itemId);
+      const item = vendorItemsList.find(item => item.id === itemId);
+
+      if (!item) {
+        alert('Error', 'Item not found');
+        return;
+      }
+
+      let updateData = {};
+
+      if (variantId) {
+        // Updating a variant field
+        const updatedVariants = item.variants.map(variant => {
+          if (variant.id === variantId) {
+            const updatedVariant = { ...variant };
+
+            switch (fieldName) {
+              case 'variantName':
+                updatedVariant.variantName = newValue;
+                break;
+              case 'sellingPrice':
+                if (updatedVariant.prices?.[0]) {
+                  updatedVariant.prices[0].variantSellingPrice = String(newValue);
+                }
+                break;
+              case 'measurement':
+                if (updatedVariant.prices?.[0]) {
+                  updatedVariant.prices[0].variantMeasurement = newValue;
+                }
+                break;
+              case 'mrp':
+                if (updatedVariant.prices?.[0]) {
+                  updatedVariant.prices[0].variantMrp = String(newValue);
+                }
+                break;
+              case 'stock':
+                updatedVariant.variantStock = Number(newValue);
+                break;
+              case 'buyingPrice':
+                if (updatedVariant.prices?.[0]) {
+                  updatedVariant.prices[0].variantPrice = String(newValue);
+                }
+                break;
+              default:
+                console.warn('Unknown field:', fieldName);
+            }
+            return updatedVariant;
+          }
+          return variant;
+        });
+
+        updateData.variants = updatedVariants;
+
+      } else {
+        // Updating main item fields (for items without variants)
+        switch (fieldName) {
+          case 'sellingPrice':
+            if (item.prices?.[0]) {
+              updateData['prices.0.sellingPrice'] = Number(newValue);
+            }
+            break;
+          case 'measurement':
+            if (item.prices?.[0]) {
+              updateData['prices.0.measurement'] = newValue;
+            }
+            break;
+          case 'mrp':
+            if (item.prices?.[0]) {
+              updateData['prices.0.mrp'] = Number(newValue);
+            }
+            break;
+          case 'stock':
+            updateData.stock = Number(newValue);
+            break;
+          case 'buyingPrice':
+            if (item.prices?.[0]) {
+              updateData['prices.0.price'] = Number(newValue);
+            }
+            break;
+          default:
+            console.warn('Unknown field:', fieldName);
+        }
+      }
+
+      // Only update if we have changes
+      if (Object.keys(updateData).length > 0) {
+        await updateDoc(itemRef, updateData);
+        await fetchVendorItemsList(); // Refresh the data
+        alert('Field updated successfully!');
+      }
+
+    } catch (error) {
+      console.error('Error saving field:', error);
+      alert('Error', 'Failed to save changes. Please try again.');
+    } finally {
+      setIsBulkEditingLoaderVisible(false);
+    }
+  };
+
+  const EditableField = ({
+    itemId,
+    variantId,
+    fieldName,
+    value,
+    width,
+    placeholder,
+    keyboardType = 'default',
+    onSave
+  }) => {
+    const isEditing = editingField?.itemId === itemId &&
+      editingField?.variantId === variantId &&
+      editingField?.fieldName === fieldName;
+
+    const handlePress = () => {
+      const isSameField = editingField?.itemId === itemId &&
+        editingField?.variantId === variantId &&
+        editingField?.fieldName === fieldName;
+
+      if (editingField && !isSameField) {
+        // Different field is being edited, ask user what to do
+        setNextEditField({ itemId, variantId, fieldName, value });
+        setShowSaveAlert(true);
+      } else {
+        // Start editing this field (either no field editing or same field)
+        setEditingField({ itemId, variantId, fieldName, value });
+        setPendingChanges(prev => ({
+          ...prev,
+          [`${itemId}-${variantId}-${fieldName}`]: value
+        }));
+      }
+    };
+
+    const handleSave = () => {
+      const newValue = pendingChanges[`${itemId}-${variantId}-${fieldName}`] || value;
+      onSave(itemId, variantId, fieldName, newValue);
+      setEditingField(null);
+      setPendingChanges(prev => {
+        const newChanges = { ...prev };
+        delete newChanges[`${itemId}-${variantId}-${fieldName}`];
+        return newChanges;
+      });
+    };
+
+    const handleCancel = () => {
+      setEditingField(null);
+      setPendingChanges(prev => {
+        const newChanges = { ...prev };
+        delete newChanges[`${itemId}-${variantId}-${fieldName}`];
+        return newChanges;
+      });
+    };
+
+    const handleChangeText = (text) => {
+      setPendingChanges(prev => ({
+        ...prev,
+        [`${itemId}-${variantId}-${fieldName}`]: text
+      }));
+    };
+
+    if (isEditing) {
+      return (
+        <View style={{ alignItems: 'center' }}>
+          <TextInput
+            value={pendingChanges[`${itemId}-${variantId}-${fieldName}`] || value}
+            onChangeText={handleChangeText}
+            keyboardType={keyboardType}
+            className="border border-blue-500 text-center text-black text-[12px] py-[5px]"
+            placeholder={placeholder}
+            placeholderTextColor="#ccc"
+            autoFocus
+          />
+          <View style={{ flexDirection: 'row', marginLeft: 4 }}>
+            <TouchableOpacity onPress={handleSave} className="bg-green-500 px-2 py-1 rounded">
+              <Text className="text-white text-[10px]">✓</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleCancel} className="bg-red-500 px-2 py-1 rounded ml-1">
+              <Text className="text-white text-[10px]">✕</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity onPress={handlePress} style={{ width }}>
+        <Text className="border border-[#ccc] text-center text-black text-[12px] py-[5px]">
+          {value || placeholder}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  useEffect(() => {
+    // Cleanup when component unmounts
+    return () => {
+      setEditingField(null);
+      setPendingChanges({});
+      setShowSaveAlert(false);
+      setNextEditField(null);
+    };
+  }, []);
 
   return (
     <View>
@@ -498,12 +707,64 @@ export default function Home() {
                                                   <View className='bg-[#e6f3ff]' >
                                                     {groupedItem.variants.map((variant) => (
                                                       <View className="flex-row gap-[4px]">
-                                                        <Text className="border border-[#ccc] w-[150px] text-center">{variant?.variantName || 'Name'}</Text>
-                                                        <Text className="border border-[#ccc] w-[80px] text-center">{variant?.prices?.[0]?.variantSellingPrice?.toString() || 'SP'}</Text>
-                                                        <Text className="border border-[#ccc] w-[80px] text-center">{variant?.prices?.[0]?.variantMeasurement || 'Mea.'}</Text>
-                                                        <Text className="border border-[#ccc] w-[80px] text-center">{variant?.prices?.[0]?.variantMrp?.toString() || 'MRP'}</Text>
-                                                        <Text className="border border-[#ccc] w-[70px] text-center">{variant?.variantStock?.toString() || '0'}</Text>
-                                                        <Text className="border border-[#ccc] w-[80px] text-center">{variant?.prices?.[0]?.variantPrice?.toString() || 'BP'}</Text>
+                                                        <EditableField
+                                                          itemId={groupedItem.id}
+                                                          variantId={variant.id}
+                                                          fieldName="variantName"
+                                                          value={variant?.variantName || ''}
+                                                          width={150}
+                                                          placeholder="Name"
+                                                          onSave={handleSaveField}
+                                                        />
+                                                        <EditableField
+                                                          itemId={groupedItem.id}
+                                                          variantId={variant.id}
+                                                          fieldName="sellingPrice"
+                                                          value={variant?.prices?.[0]?.variantSellingPrice?.toString() || ''}
+                                                          width={80}
+                                                          placeholder="SP"
+                                                          keyboardType="numeric"
+                                                          onSave={handleSaveField}
+                                                        />
+                                                        <EditableField
+                                                          itemId={groupedItem.id}
+                                                          variantId={variant.id}
+                                                          fieldName="measurement"
+                                                          value={variant?.prices?.[0]?.variantMeasurement || ''}
+                                                          width={80}
+                                                          placeholder="Mea."
+                                                          onSave={handleSaveField}
+                                                        />
+                                                        <EditableField
+                                                          itemId={groupedItem.id}
+                                                          variantId={variant.id}
+                                                          fieldName="mrp"
+                                                          value={variant?.prices?.[0]?.variantMrp?.toString() || ''}
+                                                          width={80}
+                                                          placeholder="MRP"
+                                                          keyboardType="numeric"
+                                                          onSave={handleSaveField}
+                                                        />
+                                                        <EditableField
+                                                          itemId={groupedItem.id}
+                                                          variantId={variant.id}
+                                                          fieldName="stock"
+                                                          value={variant?.variantStock?.toString() || ''}
+                                                          width={70}
+                                                          placeholder="0"
+                                                          keyboardType="numeric"
+                                                          onSave={handleSaveField}
+                                                        />
+                                                        <EditableField
+                                                          itemId={groupedItem.id}
+                                                          variantId={variant.id}
+                                                          fieldName="buyingPrice"
+                                                          value={variant?.prices?.[0]?.variantPrice?.toString() || ''}
+                                                          width={80}
+                                                          placeholder="BP"
+                                                          keyboardType="numeric"
+                                                          onSave={handleSaveField}
+                                                        />
                                                       </View>
                                                     ))}
                                                     {addNewVariantSectionVisibleFor === groupedItem?.id && (
@@ -672,12 +933,64 @@ export default function Home() {
                                             <View className="flex-1 bg-[#e6f3ff]">
                                               {item.variants.map((variant) => (
                                                 <View className="flex-row gap-[4px]">
-                                                  <Text className="border border-[#ccc] w-[150px] text-center">{variant?.variantName || 'Name'}</Text>
-                                                  <Text className="border border-[#ccc] w-[80px] text-center">{variant?.prices?.[0]?.variantSellingPrice?.toString() || 'SP'}</Text>
-                                                  <Text className="border border-[#ccc] w-[80px] text-center">{variant?.prices?.[0]?.variantMeasurement || 'Mea.'}</Text>
-                                                  <Text className="border border-[#ccc] w-[80px] text-center">{variant?.prices?.[0]?.variantMrp?.toString() || 'MRP'}</Text>
-                                                  <Text className="border border-[#ccc] w-[70px] text-center">{variant?.variantStock?.toString() || '0'}</Text>
-                                                  <Text className="border border-[#ccc] w-[80px] text-center">{variant?.prices?.[0]?.variantPrice?.toString() || 'BP'}</Text>
+                                                  <EditableField
+                                                    itemId={item.id}
+                                                    variantId={variant.id}
+                                                    fieldName="variantName"
+                                                    value={variant?.variantName || ''}
+                                                    width={150}
+                                                    placeholder="Name"
+                                                    onSave={handleSaveField}
+                                                  />
+                                                  <EditableField
+                                                    itemId={item.id}
+                                                    variantId={variant.id}
+                                                    fieldName="sellingPrice"
+                                                    value={variant?.prices?.[0]?.variantSellingPrice?.toString() || ''}
+                                                    width={80}
+                                                    placeholder="SP"
+                                                    keyboardType="numeric"
+                                                    onSave={handleSaveField}
+                                                  />
+                                                  <EditableField
+                                                    itemId={item.id}
+                                                    variantId={variant.id}
+                                                    fieldName="measurement"
+                                                    value={variant?.prices?.[0]?.variantMeasurement || ''}
+                                                    width={80}
+                                                    placeholder="Mea."
+                                                    onSave={handleSaveField}
+                                                  />
+                                                  <EditableField
+                                                    itemId={item.id}
+                                                    variantId={variant.id}
+                                                    fieldName="mrp"
+                                                    value={variant?.prices?.[0]?.variantMrp?.toString() || ''}
+                                                    width={80}
+                                                    placeholder="MRP"
+                                                    keyboardType="numeric"
+                                                    onSave={handleSaveField}
+                                                  />
+                                                  <EditableField
+                                                    itemId={item.id}
+                                                    variantId={variant.id}
+                                                    fieldName="stock"
+                                                    value={variant?.variantStock?.toString() || ''}
+                                                    width={70}
+                                                    placeholder="0"
+                                                    keyboardType="numeric"
+                                                    onSave={handleSaveField}
+                                                  />
+                                                  <EditableField
+                                                    itemId={item.id}
+                                                    variantId={variant.id}
+                                                    fieldName="buyingPrice"
+                                                    value={variant?.prices?.[0]?.variantPrice?.toString() || ''}
+                                                    width={80}
+                                                    placeholder="BP"
+                                                    keyboardType="numeric"
+                                                    onSave={handleSaveField}
+                                                  />
                                                 </View>
                                               ))}
                                               {addNewVariantSectionVisibleFor === item?.id && (
@@ -955,6 +1268,60 @@ export default function Home() {
           <Text className='p-[10px] text-center text-[24px]' >Comming Soon...</Text>
         )}
       </View>
+
+      {showSaveAlert && (
+        <View className="absolute inset-0 bg-black bg-opacity-50 justify-center items-center z-50">
+          <View className="bg-white p-4 rounded-lg mx-4">
+            <Text className="text-lg font-bold mb-2">Save Changes?</Text>
+            <Text className="mb-4">You have unsaved changes. Do you want to save before editing another field?</Text>
+            <View className="flex-row justify-between">
+              <TouchableOpacity
+                onPress={() => {
+                  if (editingField && nextEditField) {
+                    // Save current changes first
+                    const { itemId, variantId, fieldName, value } = editingField;
+                    const currentValue = pendingChanges[`${itemId}-${variantId}-${fieldName}`] || value;
+                    handleSaveField(itemId, variantId, fieldName, currentValue);
+                    setEditingField(nextEditField);
+                  }
+                  setShowSaveAlert(false);
+                  setNextEditField(null);
+                }}
+                className="bg-green-500 px-4 py-2 rounded"
+              >
+                <Text className="text-white">Save</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  if (editingField && nextEditField) {
+                    // Discard current changes
+                    setEditingField(nextEditField);
+                    setPendingChanges(prev => {
+                      const newChanges = { ...prev };
+                      delete newChanges[`${editingField.itemId}-${editingField.variantId}-${editingField.fieldName}`];
+                      return newChanges;
+                    });
+                  }
+                  setShowSaveAlert(false);
+                  setNextEditField(null);
+                }}
+                className="bg-gray-500 px-4 py-2 rounded"
+              >
+                <Text className="text-white">Discard</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowSaveAlert(false);
+                  setNextEditField(null);
+                }}
+                className="bg-red-500 px-4 py-2 rounded"
+              >
+                <Text className="text-white">Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </View >
   );
 }
