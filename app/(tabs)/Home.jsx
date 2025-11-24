@@ -422,19 +422,13 @@ export default function Home() {
                   </View>
                 );
                 return (
-                  <ScrollView
-                    horizontal={true}
-                    vertical={true}
-                    showsHorizontalScrollIndicator={false}
-                    showsVerticalScrollIndicator={true}
-                    contentContainerStyle={{ flexGrow: 1 }}
-                  >
-                    {isBulkEditingLoaderVisible && (
-                      <Loader />
-                    )}
-                    {/* Fixed-width container so the content doesn't shrink */}
-                    <View style={{ width: (addNewVariantSectionVisibleFor || addNewItemSectionVisibleFor) ? 1200 : 850 }}> {/* Adjust this width to your maximum expected row width */}
-                      <View className='flex-row w-full gap-[4px] mb-[4px]' >
+                  <ScrollView nestedScrollEnabled={true} horizontal={true}>
+                    <View style={{ flex: 1 }}>
+                      {isBulkEditingLoaderVisible && (
+                        <Loader />
+                      )}
+                      {/* Header Row */}
+                      <View style={{ flexDirection: 'row', backgroundColor: '#f0f0f0', position: 'sticky', top: 0, zIndex: 1, gap: 4 }}>
                         <Text className='text-center w-[120px] text-[12px] bg-black text-white py-[5px]' >Category</Text>
                         <Text className='text-center w-[150px] text-[12px] bg-black text-white py-[5px]' >Item Name</Text>
                         <Text className='text-center w-[150px] text-[12px] bg-black text-white py-[5px]' >Variant Name</Text>
@@ -443,12 +437,12 @@ export default function Home() {
                         <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >MRP</Text>
                         <Text className='text-center w-[70px] text-[12px] bg-black text-white py-[5px]' >Stock</Text>
                         <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Buy. Price</Text>
+                        {/* ... more header cells */}
                       </View>
-                      <FlatList
-                        data={sortedCategorySections}
-                        // scrollEnabled={false}   // VERY IMPORTANT: disable inner vertical scrolling
-                        keyExtractor={(section) => section.categoryId}
-                        renderItem={({ item: section }) => (
+
+                      {/* Data Rows */}
+                      <ScrollView nestedScrollEnabled={true} style={{ height: 'calc(100vh - 200px)' }} >
+                        {sortedCategorySections.map((section) => (
                           <View className="mb-[2px] flex-row">
                             {/* Category Header */}
                             {section.categoryName !== 'Uncategorized' ? (
@@ -924,9 +918,8 @@ export default function Home() {
                               )}
                             </View>
                           </View>
-                        )}
-                      />
-
+                        ))}
+                      </ScrollView>
                     </View>
                   </ScrollView>
                 );
@@ -962,6 +955,6 @@ export default function Home() {
           <Text className='p-[10px] text-center text-[24px]' >Comming Soon...</Text>
         )}
       </View>
-    </View>
+    </View >
   );
 }

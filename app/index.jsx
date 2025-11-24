@@ -7,7 +7,7 @@ import { db } from '@/firebase';
 import { decryptData, encryptData } from './context/hashing';
 
 const Index = () => {
-  const { setCustomerFullData, setCustomerMobileNumber, setCustomerPassword } = useAuth();
+  const { setVendorFullData, setVendorMobileNumber, setVendorPassword } = useAuth();
   const router = useRouter();
   const [isReady, setIsReady] = useState(false);
   const params = useLocalSearchParams();
@@ -38,18 +38,18 @@ const Index = () => {
         //   router.replace(`/Vendors/?vendor=${encodeURIComponent(oldMethod_VendorMobileNumberFromQR)}&fromQR=true`)
         //   return
         // }
-        const customerMobileNumber = typeof window !== "undefined" ? decryptData(localStorage.getItem('customerMobileNumber')) || '' : '';
-        const customerPassword = typeof window !== "undefined" ? decryptData(localStorage.getItem('customerPassword')) || '' : '';
+        const vendorMobileNumber = typeof window !== "undefined" ? decryptData(localStorage.getItem('vendorMobileNumber')) || '' : '';
+        const vendorPassword = typeof window !== "undefined" ? decryptData(localStorage.getItem('vendorPassword')) || '' : '';
 
-        if (customerMobileNumber.length === 10 && customerPassword.length > 0) {
-          const customerRef = doc(db, 'customers', customerMobileNumber);
-          const customerDocRef = await getDoc(customerRef);
-          if (customerDocRef.exists()) {
-            const dbPassword = customerDocRef.data().customerPassword;
-            if (customerPassword === dbPassword) {
-              await setCustomerFullData(customerDocRef.data());
-              await setCustomerMobileNumber(customerMobileNumber);
-              await setCustomerPassword(customerPassword);
+        if (vendorMobileNumber.length === 10 && vendorPassword.length > 0) {
+          const vendorRef = doc(db, 'users', vendorMobileNumber);
+          const vendorDocRef = await getDoc(vendorRef);
+          if (vendorDocRef.exists()) {
+            const dbPassword = vendorDocRef.data().vendorPassword;
+            if (vendorPassword === dbPassword) {
+              await setVendorFullData(vendorDocRef.data());
+              await setVendorMobileNumber(vendorMobileNumber);
+              await setVendorPassword(vendorPassword);
               router.replace('/(tabs)/Home');
               return;
             }
@@ -61,7 +61,7 @@ const Index = () => {
       }
     };
     redirect();
-  }, [isReady, router, setCustomerFullData, setCustomerMobileNumber, setCustomerPassword, isChecked]);
+  }, [isReady, router, setVendorFullData, setVendorMobileNumber, setVendorPassword, isChecked]);
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#2874F0' }}>
