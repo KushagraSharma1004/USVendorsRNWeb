@@ -1,10 +1,17 @@
+import { useState } from 'react'
 import { View, Image } from 'react-native'
 import { Tabs } from 'expo-router'
+import SubMenuModal from '../components/SubMenuModal'
 
 const TabsLayout = () => {
+    const [isSubMenuModalVisible, setIsSubMenuModalVisible] = useState(false)
 
+    const onSubMenuModalClose = () => setIsSubMenuModalVisible(false)
+    const openSubMenuModal = () => setIsSubMenuModalVisible(true)
+    
     return (
         <View className={`flex-1`}>
+            <SubMenuModal isVisible={isSubMenuModalVisible} onClose={onSubMenuModalClose} />
             <Tabs
                 initialRouteName="Home"
                 screenOptions={{
@@ -35,6 +42,19 @@ const TabsLayout = () => {
                     name='Home'
                     options={{
                         tabBarIcon: ({ focused }) => <Image style={{ height: 35, width: 35, tintColor: focused ? 'white' : '' }} source={require('../../assets/images/homeImage.png')} />,
+                    }}
+                />
+                <Tabs.Screen
+                    name='SubMenu'
+                    options={{
+                        tabBarIcon: ({ focused }) => <Image style={{ height: 35, width: 35, tintColor: focused ? 'white' : '' }} source={require('../../assets/images/menuImage.png')} />,
+                        title: 'Menu'
+                    }}
+                    listeners={{
+                        tabPress: (e) => {
+                            e.preventDefault();
+                            openSubMenuModal();
+                        },
                     }}
                 />
             </Tabs>

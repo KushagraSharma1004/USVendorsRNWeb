@@ -243,11 +243,16 @@ export default function Home() {
   };
 
   const handleSaveField = async (itemId, variantId, fieldName, newValue) => {
+    // Additional validation to prevent empty values
+    if (!newValue || newValue.toString().trim() === '') {
+      alert('Empty values are not allowed');
+      return;
+    }
+
     setIsBulkEditingLoaderVisible(true);
     try {
       const itemRef = doc(db, 'users', vendorMobileNumber, 'list', itemId);
       const item = vendorItemsList.find(item => item.id === itemId);
-
       if (!item) {
         alert('Error', 'Item not found');
         return;
@@ -260,10 +265,9 @@ export default function Home() {
         const updatedVariants = item.variants.map(variant => {
           if (variant.id === variantId) {
             const updatedVariant = { ...variant };
-
             switch (fieldName) {
               case 'variantName':
-                updatedVariant.variantName = newValue;
+                updatedVariant.variantName = newValue.trim();
                 break;
               case 'sellingPrice':
                 if (updatedVariant.prices?.[0]) {
@@ -272,7 +276,7 @@ export default function Home() {
                 break;
               case 'measurement':
                 if (updatedVariant.prices?.[0]) {
-                  updatedVariant.prices[0].variantMeasurement = newValue;
+                  updatedVariant.prices[0].variantMeasurement = newValue.trim();
                 }
                 break;
               case 'mrp':
@@ -295,9 +299,7 @@ export default function Home() {
           }
           return variant;
         });
-
         updateData.variants = updatedVariants;
-
       } else {
         // Updating main item fields (for items without variants)
         switch (fieldName) {
@@ -308,7 +310,7 @@ export default function Home() {
             break;
           case 'measurement':
             if (item.prices?.[0]) {
-              updateData['prices.0.measurement'] = newValue;
+              updateData['prices.0.measurement'] = newValue.trim();
             }
             break;
           case 'mrp':
@@ -335,7 +337,6 @@ export default function Home() {
         await fetchVendorItemsList(); // Refresh the data
         alert('Field updated successfully!');
       }
-
     } catch (error) {
       console.error('Error saving field:', error);
       alert('Error', 'Failed to save changes. Please try again.');
@@ -372,13 +373,28 @@ export default function Home() {
         setEditingField({ itemId, variantId, fieldName, value });
         setPendingChanges(prev => ({
           ...prev,
-          [`${itemId}-${variantId}-${fieldName}`]: value
+          [`${itemId}-${variantId}-${fieldName}`]: value || ''
         }));
       }
     };
 
     const handleSave = () => {
-      const newValue = pendingChanges[`${itemId}-${variantId}-${fieldName}`] || value;
+      const currentValue = pendingChanges[`${itemId}-${variantId}-${fieldName}`];
+
+      // Check if the field is empty after trimming
+      if (currentValue !== undefined && currentValue.trim() === '') {
+        alert('Empty values are not allowed');
+        return;
+      }
+
+      const newValue = currentValue !== undefined ? currentValue : value;
+
+      // Additional check for the original value
+      if (!newValue || newValue.toString().trim() === '') {
+        alert('Empty values are not allowed');
+        return;
+      }
+
       onSave(itemId, variantId, fieldName, newValue);
       setEditingField(null);
       setPendingChanges(prev => {
@@ -406,12 +422,14 @@ export default function Home() {
 
     if (isEditing) {
       return (
-        <View style={{ alignItems: 'center' }}>
+        <View style={{ alignItems: 'center', width: width }}>
           <TextInput
-            value={pendingChanges[`${itemId}-${variantId}-${fieldName}`] || value}
+            value={pendingChanges[`${itemId}-${variantId}-${fieldName}`] !== undefined
+              ? pendingChanges[`${itemId}-${variantId}-${fieldName}`]
+              : value || ''}
             onChangeText={handleChangeText}
             keyboardType={keyboardType}
-            className="border border-blue-500 text-center text-black text-[12px] py-[5px]"
+            className={`border border-blue-500 text-center text-black text-[12px] py-[5px] w-[${width}px]`}
             placeholder={placeholder}
             placeholderTextColor="#ccc"
             autoFocus
