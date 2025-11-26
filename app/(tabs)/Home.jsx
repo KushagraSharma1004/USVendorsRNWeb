@@ -465,6 +465,38 @@ export default function Home() {
     };
   }, []);
 
+  const handleDeleteVariant = async (baseItem, variant) => {
+  // Show confirmation dialog for web
+  const isConfirmed = window.confirm(
+    `Are you sure you want to delete "${variant.variantName}"?`
+  );
+
+  if (!isConfirmed) return;
+
+  setIsBulkEditingLoaderVisible(true);
+  try {
+    const itemRef = doc(db, 'users', vendorMobileNumber, 'list', baseItem.id);
+    
+    // Filter out the variant to be deleted
+    const updatedVariants = baseItem.variants.filter(v => v.id !== variant.id);
+    
+    // Update Firestore with the filtered variants array
+    await updateDoc(itemRef, {
+      variants: updatedVariants
+    });
+
+    // Refresh the data
+    await fetchVendorItemsList();
+    
+    alert('Variant deleted successfully!');
+  } catch (error) {
+    console.error('Error deleting variant:', error);
+    alert('Error: Failed to delete variant. Please try again.');
+  } finally {
+    setIsBulkEditingLoaderVisible(false);
+  }
+}
+
   return (
     <View>
 
@@ -783,6 +815,7 @@ export default function Home() {
                                                           keyboardType="numeric"
                                                           onSave={handleSaveField}
                                                         />
+                                                        <TouchableOpacity className='py-[5px] px-[10px] bg-primaryRed rounded-[5px]' onPress={() => handleDeleteVariant(groupedItem, variant)}><Text className='text-center text-white' >Delete</Text></TouchableOpacity>
                                                       </View>
                                                     ))}
                                                     {addNewVariantSectionVisibleFor === groupedItem?.id && (
@@ -1009,6 +1042,7 @@ export default function Home() {
                                                     keyboardType="numeric"
                                                     onSave={handleSaveField}
                                                   />
+                                                        <TouchableOpacity className='py-[5px] px-[10px] bg-primaryRed rounded-[5px]' onPress={() => handleDeleteVariant(item, variant)}><Text className='text-center text-white' >Delete</Text></TouchableOpacity>
                                                 </View>
                                               ))}
                                               {addNewVariantSectionVisibleFor === item?.id && (
