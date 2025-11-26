@@ -8,6 +8,7 @@ import Loader from '../components/Loader'
 export default function Home() {
   const { vendorMobileNumber } = useAuth()
   const Section = {
+    SALES:'sales',
     BULKEDIT: 'bulkedit',
     SERVICEAREAFENCING: 'serviceareafencing',
     DELIVERYMODES: 'deliverymodes',
@@ -501,6 +502,14 @@ export default function Home() {
     <View>
 
       <ScrollView showsHorizontalScrollIndicator={false} contentContainerClassName="gap-[2px]" className="w-full max-h-[100px]" horizontal>
+        {/* Sales */}
+        <TouchableOpacity
+          onPress={() => toggleSection(Section.SALES)}
+          className={`h-full w-[120px] border-[5px] rounded-[5px] ${isSectionActive(Section.SALES) ? 'bg-wheat' : 'bg-white'} border-primary p-[10px] items-center justify-center`} >
+          <Text className="font-bold text-primary text-[16px] text-center" >Sales</Text>
+          {/* <Text className="font-bold text-primary text-[16px] text-center" >({allVendorsList?.length || 0})</Text> */}
+        </TouchableOpacity>
+        
         {/* Bulk Editing */}
         <TouchableOpacity
           onPress={() => toggleSection(Section.BULKEDIT)}
@@ -600,6 +609,11 @@ export default function Home() {
       </ScrollView>
 
       <View className='flex-1'>
+        {activeSection === 'sales' && (
+          <View>
+
+          </View>
+        )}
         {activeSection === 'bulkedit' && (
           <View>
             {vendorItemsList.length > 0 && (
@@ -815,7 +829,7 @@ export default function Home() {
                                                           keyboardType="numeric"
                                                           onSave={handleSaveField}
                                                         />
-                                                        <TouchableOpacity className='py-[5px] px-[10px] bg-primaryRed rounded-[5px]' onPress={() => handleDeleteVariant(groupedItem, variant)}><Text className='text-center text-white' >Delete</Text></TouchableOpacity>
+                                                        <TouchableOpacity className='py-[5px] px-[10px] bg-primaryRed border border-[#ffffff]' onPress={() => handleDeleteVariant(groupedItem, variant)}><Text className='text-center text-white' >Delete</Text></TouchableOpacity>
                                                       </View>
                                                     ))}
                                                     {addNewVariantSectionVisibleFor === groupedItem?.id && (
@@ -1042,7 +1056,7 @@ export default function Home() {
                                                     keyboardType="numeric"
                                                     onSave={handleSaveField}
                                                   />
-                                                        <TouchableOpacity className='py-[5px] px-[10px] bg-primaryRed rounded-[5px]' onPress={() => handleDeleteVariant(item, variant)}><Text className='text-center text-white' >Delete</Text></TouchableOpacity>
+                                                        <TouchableOpacity className='py-[5px] px-[10px] bg-primaryRed border border-[#ffffff]' onPress={() => handleDeleteVariant(item, variant)}><Text className='text-center text-white' >Delete</Text></TouchableOpacity>
                                                 </View>
                                               ))}
                                               {addNewVariantSectionVisibleFor === item?.id && (
