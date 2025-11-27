@@ -4,6 +4,8 @@ import { collection, addDoc, arrayUnion, updateDoc, doc, getDocs } from 'firebas
 import { db } from '@/firebase'
 import { useAuth } from '../context/AuthContext'
 import Loader from '../components/Loader'
+import { Calendar, DateObject } from 'react-native-calendars';
+import { LocaleConfig } from 'react-native-calendars';
 
 export default function Home() {
   const { vendorMobileNumber } = useAuth()
@@ -46,6 +48,21 @@ export default function Home() {
   const [ordersToSummarize, setOrdersToSummarize] = useState({})
   const [selectedOrderStatus, setSelectedOrderStatus] = useState('Pending')
   const [isTotalItemsListModalVisible, setIsTotalItemsListModalVisible] = useState(false)
+  const [isDeliverySortSelected, setIsDeliverySortSelected] = useState(false)
+  const [selectedDeliveryFilters, setSelectedDeliveryFilters] = useState([])
+  const [isTimeSortSelected, setIsTimeSortSelected] = useState(false)
+  const [selectedTimeFilter, setSelectedTimeFilter] = useState(null)
+  const [isCustomRangeModalVisible, setIsCustomRangeModalVisible] = useState(false)
+  const [customStartDate, setCustomStartDate] = useState(null)
+  const [customEndDate, setCustomEndDate] = useState(null)
+  LocaleConfig.locales['en'] = {
+    monthNames: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+    monthNamesShort: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    dayNames: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+    dayNamesShort: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
+  };
+  LocaleConfig.defaultLocale = 'en';
+
   const fetchVendorItemsList = async () => {
     try {
       const vendorItemsRef = collection(db, 'users', vendorMobileNumber, 'list')
@@ -555,6 +572,32 @@ export default function Home() {
     }
   }
 
+  const getDatesInRange = (startDate, endDate) => {
+    if (!startDate || !endDate) return {};
+
+    const dates = {};
+    let currentDate = new Date(startDate);
+    const lastDate = new Date(endDate);
+
+    // Reset times to avoid timezone issues
+    currentDate.setHours(0, 0, 0, 0);
+    lastDate.setHours(0, 0, 0, 0);
+
+    while (currentDate <= lastDate) {
+      const dateString = currentDate.toISOString().split('T')[0];
+      dates[dateString] = {
+        selected: true,
+        color: '#00adf5',
+        textColor: '#ffffff'
+      };
+
+      // Move to next day
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return dates;
+  };
+
   return (
     <View>
 
@@ -782,9 +825,6 @@ export default function Home() {
                   </>
                 )}
               </TouchableOpacity>
-              <TouchableOpacity className=''>
-                <Image source={require('@/assets/images/sortImage.png')} style={{ width: 30, height: 30 }} className='w-[20px] h-[20px]' />
-              </TouchableOpacity>
             </View>
 
             <ScrollView nestedScrollEnabled={true} horizontal={true}>
@@ -796,28 +836,475 @@ export default function Home() {
                   <Text className='text-center w-[165px] text-[12px] bg-black text-white py-[5px]' >Order Id</Text>
                   <Text className='text-center w-[60px] text-[12px] bg-black text-white py-[5px]' >Status</Text>
                   <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Items</Text>
+                  <View className='flex-row bg-black w-[150px] py-[5px] items-center justify-between px-[5px]'>
+                    <Text className='text-center text-[12px] text-white'>
+                      {selectedDeliveryFilters.length > 0 ? `${selectedDeliveryFilters.length} Selected` : 'Delivery Mode'}
+                    </Text>
+                    <TouchableOpacity onPress={() => setIsDeliverySortSelected(!isDeliverySortSelected)}>
+                      <Image source={require('@/assets/images/sortImage.png')} style={{ width: 15, height: 15 }} className='w-[20px] h-[20px]' />
+                    </TouchableOpacity>
+                    {selectedDeliveryFilters.length > 0 && (
+                      <TouchableOpacity
+                        onPress={() => setSelectedDeliveryFilters([])}
+                        className="ml-1"
+                      >
+                        <Text className="text-white text-[10px] bg-primaryRed px-1 rounded">Clear</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                   <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Total</Text>
                   <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Sub Total</Text>
                   <Text className='text-center w-[100px] text-[12px] bg-black text-white py-[5px]' >Delivery Charge</Text>
                   <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Offer</Text>
-                  <Text className='text-center w-[130px] text-[12px] bg-black text-white py-[5px]' >Time</Text>
+                  <View className='flex-row bg-black w-[130px] py-[5px] items-center justify-between px-[5px]'>
+                    <Text className='text-center text-[12px] text-white'>
+                      {selectedTimeFilter === 'custom' ? 'Custom Range' : 'Time'}
+                    </Text>
+                    <TouchableOpacity onPress={() => setIsTimeSortSelected(!isTimeSortSelected)}>
+                      <Image source={require('@/assets/images/sortImage.png')} style={{ width: 15, height: 15 }} className='w-[20px] h-[20px]' />
+                    </TouchableOpacity>
+                    {selectedTimeFilter && (
+                      <TouchableOpacity
+                        onPress={() => setSelectedTimeFilter(null)}
+                        className="ml-1"
+                      >
+                        <Text className="text-white text-[10px] bg-primaryRed px-1 rounded">Clear</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
+
+                {/* Delivery Mode Filter Dropdown */}
+                {isDeliverySortSelected && (
+                  <View className="bg-white border border-gray-300 rounded-[5px] max-h-[350px] max-w-fit absolute top-[25px] left-[357px] z-50 shadow-md">
+                    {/* Apply/Clear Buttons */}
+                    <View className="flex-row border-t border-gray-300">
+                      <TouchableOpacity
+                        onPress={() => setIsDeliverySortSelected(false)}
+                        className="flex-1 p-2 bg-primaryGreen"
+                      >
+                        <Text className="text-white text-center font-bold">Apply</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSelectedDeliveryFilters([]);
+                          setIsDeliverySortSelected(false);
+                        }}
+                        className="flex-1 p-2 bg-primaryRed"
+                      >
+                        <Text className="text-white text-center font-bold">Clear All</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <ScrollView nestedScrollEnabled={true}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSelectedDeliveryFilters([])
+                          setIsDeliverySortSelected(false)
+                        }}
+                        className={`p-2 border-b border-gray-200 ${selectedDeliveryFilters.length === 0 ? 'bg-primary' : ''}`}
+                      >
+                        <Text className={`text-center ${selectedDeliveryFilters.length === 0 ? 'text-white' : ''}`}>All</Text>
+                      </TouchableOpacity>
+
+                      {/* Home Delivery */}
+                      <TouchableOpacity
+                        onPress={() => {
+                          const filter = 'Home Delivery';
+                          setSelectedDeliveryFilters(prev =>
+                            prev.includes(filter)
+                              ? prev.filter(f => f !== filter)
+                              : [...prev, filter]
+                          );
+                        }}
+                        className={`p-2 border-b border-gray-200 flex-row items-center ${selectedDeliveryFilters.includes('Home Delivery') ? 'bg-primary' : ''}`}
+                      >
+                        <Text className={`text-center flex-1 ${selectedDeliveryFilters.includes('Home Delivery') ? 'text-white' : 'text-primaryGreen'}`}>
+                          Home Delivery
+                        </Text>
+                        {selectedDeliveryFilters.includes('Home Delivery') && (
+                          <Text className="text-white ml-2">✓</Text>
+                        )}
+                      </TouchableOpacity>
+
+                      {/* Takeaway/Pickup */}
+                      <TouchableOpacity
+                        onPress={() => {
+                          const filter = 'Takeaway/Pickup';
+                          setSelectedDeliveryFilters(prev =>
+                            prev.includes(filter)
+                              ? prev.filter(f => f !== filter)
+                              : [...prev, filter]
+                          );
+                        }}
+                        className={`p-2 border-b border-gray-200 flex-row items-center ${selectedDeliveryFilters.includes('Takeaway/Pickup') ? 'bg-primary' : ''}`}
+                      >
+                        <Text className={`text-center flex-1 ${selectedDeliveryFilters.includes('Takeaway/Pickup') ? 'text-white' : 'text-primaryRed'}`}>
+                          Takeaway/Pickup
+                        </Text>
+                        {selectedDeliveryFilters.includes('Takeaway/Pickup') && (
+                          <Text className="text-white ml-2">✓</Text>
+                        )}
+                      </TouchableOpacity>
+
+                      {/* QR Codes (Unique) */}
+                      {(() => {
+                        const uniqueQRCodes = [...new Set(vendorOrders.filter((order) => selectedOrderStatus === 'Pending' ? order?.orderStatus === 'Pending' : selectedOrderStatus === 'Approved' ? order?.orderStatus === 'Approved' : selectedOrderStatus === 'Rejected' ? order?.orderStatus === 'Rejected' : true)
+                          .filter(order => order.QRCodeMessage)
+                          .map(order => order.QRCodeMessage)
+                        )]
+
+                        return uniqueQRCodes.map((qrMessage, index) => {
+                          const filter = `QR:${qrMessage}`;
+                          return (
+                            <TouchableOpacity
+                              key={index}
+                              onPress={() => {
+                                setSelectedDeliveryFilters(prev =>
+                                  prev.includes(filter)
+                                    ? prev.filter(f => f !== filter)
+                                    : [...prev, filter]
+                                );
+                              }}
+                              className={`p-2 border-b border-gray-200 flex-row items-center ${selectedDeliveryFilters.includes(filter) ? 'bg-primary' : ''}`}
+                            >
+                              <Text className={`text-center flex-1 ${selectedDeliveryFilters.includes(filter) ? 'text-white' : ''}`}>
+                                QR: {qrMessage}
+                              </Text>
+                              {selectedDeliveryFilters.includes(filter) && (
+                                <Text className="text-white ml-2">✓</Text>
+                              )}
+                            </TouchableOpacity>
+                          )
+                        })
+                      })()}
+                    </ScrollView>
+                  </View>
+                )}
+
+                {/* Time Filter Dropdown */}
+                {isTimeSortSelected && (
+                  <View className="bg-white border border-gray-300 rounded-[5px] max-h-[350px] max-w-fit absolute top-[25px] left-[870px] z-50 shadow-md">
+                    <ScrollView nestedScrollEnabled={true}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSelectedTimeFilter(null)
+                          setIsTimeSortSelected(false)
+                        }}
+                        className="p-2 border-b border-gray-200"
+                      >
+                        <Text className="text-center">All Time</Text>
+                      </TouchableOpacity>
+
+                      {/* Today */}
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSelectedTimeFilter('today')
+                          setIsTimeSortSelected(false)
+                        }}
+                        className={`p-2 border-b border-gray-200 ${selectedTimeFilter === 'today' ? 'bg-primary' : ''}`}
+                      >
+                        <Text className={`text-center ${selectedTimeFilter === 'today' ? 'text-white' : ''}`}>Today</Text>
+                      </TouchableOpacity>
+
+                      {/* Yesterday */}
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSelectedTimeFilter('yesterday')
+                          setIsTimeSortSelected(false)
+                        }}
+                        className={`p-2 border-b border-gray-200 ${selectedTimeFilter === 'yesterday' ? 'bg-primary' : ''}`}
+                      >
+                        <Text className={`text-center ${selectedTimeFilter === 'yesterday' ? 'text-white' : ''}`}>Yesterday</Text>
+                      </TouchableOpacity>
+
+                      {/* Last 7 Days */}
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSelectedTimeFilter('last7days')
+                          setIsTimeSortSelected(false)
+                        }}
+                        className={`p-2 border-b border-gray-200 ${selectedTimeFilter === 'last7days' ? 'bg-primary' : ''}`}
+                      >
+                        <Text className={`text-center ${selectedTimeFilter === 'last7days' ? 'text-white' : ''}`}>Last 7 Days</Text>
+                      </TouchableOpacity>
+
+                      {/* Last 15 Days */}
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSelectedTimeFilter('last15days')
+                          setIsTimeSortSelected(false)
+                        }}
+                        className={`p-2 border-b border-gray-200 ${selectedTimeFilter === 'last15days' ? 'bg-primary' : ''}`}
+                      >
+                        <Text className={`text-center ${selectedTimeFilter === 'last15days' ? 'text-white' : ''}`}>Last 15 Days</Text>
+                      </TouchableOpacity>
+
+                      {/* Last 30 Days */}
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSelectedTimeFilter('last30days')
+                          setIsTimeSortSelected(false)
+                        }}
+                        className={`p-2 border-b border-gray-200 ${selectedTimeFilter === 'last30days' ? 'bg-primary' : ''}`}
+                      >
+                        <Text className={`text-center ${selectedTimeFilter === 'last30days' ? 'text-white' : ''}`}>Last 30 Days</Text>
+                      </TouchableOpacity>
+
+                      {/* Last 90 Days */}
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSelectedTimeFilter('last90days')
+                          setIsTimeSortSelected(false)
+                        }}
+                        className={`p-2 border-b border-gray-200 ${selectedTimeFilter === 'last90days' ? 'bg-primary' : ''}`}
+                      >
+                        <Text className={`text-center ${selectedTimeFilter === 'last90days' ? 'text-white' : ''}`}>Last 90 Days</Text>
+                      </TouchableOpacity>
+
+                      {/* Last 365 Days */}
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSelectedTimeFilter('last365days')
+                          setIsTimeSortSelected(false)
+                        }}
+                        className={`p-2 border-b border-gray-200 ${selectedTimeFilter === 'last365days' ? 'bg-primary' : ''}`}
+                      >
+                        <Text className={`text-center ${selectedTimeFilter === 'last365days' ? 'text-white' : ''}`}>Last 365 Days</Text>
+                      </TouchableOpacity>
+
+                      {/* Custom Range */}
+                      <TouchableOpacity
+                        onPress={() => {
+                          setIsCustomRangeModalVisible(true)
+                          setIsTimeSortSelected(false)
+                        }}
+                        className="p-2 border-b border-gray-200 bg-[#ccc]"
+                      >
+                        <Text className="text-center font-bold">Custom Range</Text>
+                      </TouchableOpacity>
+                    </ScrollView>
+                  </View>
+                )}
 
                 {/* Data Rows */}
                 <ScrollView nestedScrollEnabled={true} style={{ height: Object.keys(ordersToSummarize).length > 0 ? 'calc(100vh - 350px)' : 'calc(100vh - 260px)' }} >
-                  {vendorOrders?.filter((order) => selectedOrderStatus === 'Pending' ? order?.orderStatus === 'Pending' : selectedOrderStatus === 'Approved' ? order?.orderStatus === 'Approved' : selectedOrderStatus === 'Rejected' ? order?.orderStatus === 'Rejected' : true).map((order, index) => (
-                    <TouchableOpacity key={order.id} onPress={() => setOrdersToSummarize(prev => prev[order.id] ? (() => { const { [order.id]: removed, ...rest } = prev; return rest; })() : { ...prev, [order.id]: order })} className={`flex-row gap-[4px] py-1 border-b border-gray-200 ${ordersToSummarize[order.id] ? 'bg-blue-100' : ''}`}>
-                      <Text className='text-center w-[40px] text-[12px] py-[5px]'>{(selectedOrderStatus === 'Pending' ? vendorOrders?.filter((order) => order?.orderStatus === 'Pending')?.length : selectedOrderStatus === 'Approved' ? vendorOrders?.filter((order) => order?.orderStatus === 'Approved')?.length : selectedOrderStatus === 'Rejected' ? vendorOrders?.filter((order) => order?.orderStatus === 'Rejected')?.length : vendorOrders?.length) - index}</Text>
-                      <Text className='text-center w-[165px] text-[12px] py-[5px]'>{order?.id}</Text>
-                      <Text className={`text-center w-[60px] text-[12px] py-[5px] ${order?.orderStatus === 'Pending' ? 'bg-primaryYellow' : order?.orderStatus === 'Approved' ? 'bg-primaryGreen text-white' : 'bg-primaryRed text-white'}`}>{order?.orderStatus || 'Pending'}</Text>
-                      <Text className='text-center w-[80px] text-[12px] py-[5px]'>{order?.items?.reduce((total, item) => { const quantity = Number(item?.quantity) || 0; return total + quantity; }, 0) || '0'}</Text>
-                      <Text className='text-center w-[80px] text-[12px] py-[5px]'>₹{Number(order?.totalAmount).toFixed(2) || '0'}</Text>
-                      <Text className='text-center w-[80px] text-[12px] py-[5px]'>₹{order?.items?.reduce((total, item) => { const sellingPrice = Number(item?.price?.[0]?.sellingPrice) || 0; const quantity = Number(item?.quantity) || 0; return total + (sellingPrice * quantity); }, 0).toFixed(2) || '0'}</Text>
-                      <Text className={`text-center w-[100px] text-[12px] py-[5px] ${(order?.deliveryCharge || '0') !== '0' ? 'text-primaryRed' : ''}`}>₹{order?.deliveryCharge || '0'}</Text>
-                      <Text className={`text-center w-[80px] text-[12px] py-[5px] ${(order?.totalDiscount || 0) !== 0 ? 'text-primaryGreen' : ''}`}>₹{order?.totalDiscount || '0'}</Text>
-                      <Text className={`text-center w-[130px] text-[12px] py-[5px]`}>{order?.orderTime?.toDate()?.toLocaleString() || 'No time'}</Text>
-                    </TouchableOpacity>
-                  ))}
+                  {vendorOrders
+                    ?.filter((order) => {
+                      // Status filter
+                      const statusMatch = selectedOrderStatus === 'Pending'
+                        ? order?.orderStatus === 'Pending'
+                        : selectedOrderStatus === 'Approved'
+                          ? order?.orderStatus === 'Approved'
+                          : selectedOrderStatus === 'Rejected'
+                            ? order?.orderStatus === 'Rejected'
+                            : true
+
+                      // Delivery mode filter
+                      let deliveryMatch = true
+                      if (selectedDeliveryFilters.length > 0) {
+                        deliveryMatch = selectedDeliveryFilters.some(filter => {
+                          if (filter === 'Home Delivery') {
+                            return order?.deliveryMode === 'Home Delivery'
+                          } else if (filter === 'Takeaway/Pickup') {
+                            return order?.deliveryMode === 'Takeaway/Pickup'
+                          } else if (filter.startsWith('QR:')) {
+                            const qrMessage = filter.replace('QR:', '')
+                            return order?.QRCodeMessage === qrMessage
+                          }
+                          return false
+                        })
+                      }
+
+                      // Time filter
+                      let timeMatch = true;
+                      if (selectedTimeFilter && selectedTimeFilter !== 'all') {
+                        const orderDate = order?.orderTime?.toDate?.() || new Date(order?.timestamp || 0);
+
+                        // Normalize orderDate to start of day for fair comparison
+                        const orderDay = new Date(orderDate);
+                        orderDay.setHours(0, 0, 0, 0);
+
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0); // Start of today
+
+                        switch (selectedTimeFilter) {
+                          case 'today':
+                            timeMatch = orderDay.getTime() === today.getTime();
+                            break;
+
+                          case 'yesterday': {
+                            const yesterday = new Date(today);
+                            yesterday.setDate(yesterday.getDate() - 1);
+                            timeMatch = orderDay.getTime() === yesterday.getTime();
+                            break;
+                          }
+
+                          case 'last7days': {
+                            const sevenDaysAgo = new Date(today);
+                            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6); // 7 days total including today
+                            timeMatch = orderDay >= sevenDaysAgo && orderDay <= today;
+                            break;
+                          }
+
+                          case 'last15Days': {
+                            const fifteenDaysAgo = new Date(today);
+                            fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 14); // 15 days total
+                            timeMatch = orderDay >= fifteenDaysAgo && orderDay <= today;
+                            break;
+                          }
+
+                          case 'last30Days': {
+                            const thirtyDaysAgo = new Date(today);
+                            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29); // 30 days total
+                            timeMatch = orderDay >= thirtyDaysAgo && orderDay <= today;
+                            break;
+                          }
+
+                          case 'last90Days': {
+                            const ninetyDaysAgo = new Date(today);
+                            ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 89);
+                            timeMatch = orderDay >= ninetyDaysAgo && orderDay <= today;
+                            break;
+                          }
+
+                          case 'last365Days': {
+                            const oneYearAgo = new Date(today);
+                            oneYearAgo.setDate(oneYearAgo.getDate() - 364); // 365 days total
+                            timeMatch = orderDay >= oneYearAgo && orderDay <= today;
+                            break;
+                          }
+
+                          case 'custom': {
+                            if (customStartDate && customEndDate) {
+                              const startOfRange = new Date(customStartDate);
+                              startOfRange.setHours(0, 0, 0, 0);
+
+                              const endOfRange = new Date(customEndDate);
+                              endOfRange.setHours(23, 59, 59, 999);
+
+                              timeMatch = orderDate >= startOfRange && orderDate <= endOfRange;
+                            }
+                            break;
+                          }
+
+                          default:
+                            timeMatch = true;
+                        }
+                      }
+
+                      return statusMatch && deliveryMatch && timeMatch
+                    }).map((order, index) => (
+                      <TouchableOpacity key={order.id} onPress={() => setOrdersToSummarize(prev => prev[order.id] ? (() => { const { [order.id]: removed, ...rest } = prev; return rest; })() : { ...prev, [order.id]: order })} className={`flex-row gap-[4px] py-1 border-b border-gray-200 ${ordersToSummarize[order.id] ? 'bg-blue-100' : ''}`}>
+                        <Text className='text-center w-[40px] text-[12px] py-[5px]'>
+                          {(() => {
+                            const filteredOrders = vendorOrders?.filter((order) => {
+                              // Status filter
+                              const statusMatch = selectedOrderStatus === 'Pending'
+                                ? order?.orderStatus === 'Pending'
+                                : selectedOrderStatus === 'Approved'
+                                  ? order?.orderStatus === 'Approved'
+                                  : selectedOrderStatus === 'Rejected'
+                                    ? order?.orderStatus === 'Rejected'
+                                    : true;
+
+                              // Delivery mode filter
+                              let deliveryMatch = true;
+                              if (selectedDeliveryFilters.length > 0) {
+                                deliveryMatch = selectedDeliveryFilters.some(filter => {
+                                  if (filter === 'Home Delivery') {
+                                    return order?.deliveryMode === 'Home Delivery';
+                                  } else if (filter === 'Takeaway/Pickup') {
+                                    return order?.deliveryMode === 'Takeaway/Pickup';
+                                  } else if (filter.startsWith('QR:')) {
+                                    const qrMessage = filter.replace('QR:', '');
+                                    return order?.QRCodeMessage === qrMessage;
+                                  }
+                                  return false;
+                                });
+                              }
+
+                              // Time filter
+                              let timeMatch = true;
+                              if (selectedTimeFilter && selectedTimeFilter !== 'all') {
+                                const orderDate = order?.orderTime?.toDate?.() || new Date(order?.timestamp || 0);
+                                const orderDay = new Date(orderDate);
+                                orderDay.setHours(0, 0, 0, 0);
+
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+
+                                switch (selectedTimeFilter) {
+                                  case 'today':
+                                    timeMatch = orderDay.getTime() === today.getTime();
+                                    break;
+                                  case 'yesterday': {
+                                    const yesterday = new Date(today);
+                                    yesterday.setDate(yesterday.getDate() - 1);
+                                    timeMatch = orderDay.getTime() === yesterday.getTime();
+                                    break;
+                                  }
+                                  case 'last7days': {
+                                    const sevenDaysAgo = new Date(today);
+                                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+                                    timeMatch = orderDay >= sevenDaysAgo && orderDay <= today;
+                                    break;
+                                  }
+                                  case 'last15Days': {
+                                    const fifteenDaysAgo = new Date(today);
+                                    fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 14);
+                                    timeMatch = orderDay >= fifteenDaysAgo && orderDay <= today;
+                                    break;
+                                  }
+                                  case 'last30Days': {
+                                    const thirtyDaysAgo = new Date(today);
+                                    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+                                    timeMatch = orderDay >= thirtyDaysAgo && orderDay <= today;
+                                    break;
+                                  }
+                                  case 'last90Days': {
+                                    const ninetyDaysAgo = new Date(today);
+                                    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 89);
+                                    timeMatch = orderDay >= ninetyDaysAgo && orderDay <= today;
+                                    break;
+                                  }
+                                  case 'last365Days': {
+                                    const oneYearAgo = new Date(today);
+                                    oneYearAgo.setDate(oneYearAgo.getDate() - 364);
+                                    timeMatch = orderDay >= oneYearAgo && orderDay <= today;
+                                    break;
+                                  }
+                                  case 'custom': {
+                                    if (customStartDate && customEndDate) {
+                                      const startOfRange = new Date(customStartDate);
+                                      startOfRange.setHours(0, 0, 0, 0);
+                                      const endOfRange = new Date(customEndDate);
+                                      endOfRange.setHours(23, 59, 59, 999);
+                                      timeMatch = orderDate >= startOfRange && orderDate <= endOfRange;
+                                    }
+                                    break;
+                                  }
+                                  default:
+                                    timeMatch = true;
+                                }
+                              }
+
+                              return statusMatch && deliveryMatch && timeMatch;
+                            });
+
+                            return (filteredOrders?.length || 0) - index;
+                          })()}
+                        </Text>
+                        <Text className='text-center w-[165px] text-[12px] py-[5px]'>{order?.id}</Text>
+                        <Text className={`text-center w-[60px] text-[12px] py-[5px] ${order?.orderStatus === 'Pending' ? 'bg-primaryYellow' : order?.orderStatus === 'Approved' ? 'bg-primaryGreen text-white' : 'bg-primaryRed text-white'}`}>{order?.orderStatus || 'Pending'}</Text>
+                        <Text className='text-center w-[80px] text-[12px] py-[5px]'>{order?.items?.reduce((total, item) => { const quantity = Number(item?.quantity) || 0; return total + quantity; }, 0) || '0'}</Text>
+                        <Text className={`text-center w-[150px] text-[12px] py-[5px] ${order?.deliveryMode === 'Takeaway/Pickup' ? 'text-primaryRed' : order?.deliveryMode === 'Home Delivery' ? 'text-primaryGreen' : ''}`}>{order?.deliveryMode || `QR: (${order?.QRCodeMessage})`}</Text>
+                        <Text className='text-center w-[80px] text-[12px] py-[5px]'>₹{Number(order?.totalAmount).toFixed(2) || '0'}</Text>
+                        <Text className='text-center w-[80px] text-[12px] py-[5px]'>₹{order?.items?.reduce((total, item) => { const sellingPrice = Number(item?.price?.[0]?.sellingPrice) || 0; const quantity = Number(item?.quantity) || 0; return total + (sellingPrice * quantity); }, 0).toFixed(2) || '0'}</Text>
+                        <Text className={`text-center w-[100px] text-[12px] py-[5px] ${(order?.deliveryCharge || '0') !== '0' ? 'text-primaryRed' : ''}`}>₹{order?.deliveryCharge || '0'}</Text>
+                        <Text className={`text-center w-[80px] text-[12px] py-[5px] ${(order?.totalDiscount || 0) !== 0 ? 'text-primaryGreen' : ''}`}>₹{order?.totalDiscount || '0'}</Text>
+                        <Text className={`text-center w-[130px] text-[12px] py-[5px]`}>{order?.orderTime?.toDate()?.toLocaleString() || 'No time'}</Text>
+                      </TouchableOpacity>
+                    ))}
 
                   {vendorOrders.length === 0 && !isBulkEditingLoaderVisible && (
                     <Text className="text-center py-4 text-gray-500">No orders found</Text>
@@ -1649,20 +2136,20 @@ export default function Home() {
                 keyExtractor={(item, index) => index.toString()}
                 renderItem={({ item, index }) => (
                   <View className='bg-white rounded-[5px] p-[10px] w-full flex-row h-[120px] border' >
-                    <Image style={{height:100, width: 100}} className='rounded-[5px] shadow-md' resizeMode='stretch' source={item?.imageURL ? {uri: item?.imageURL} : require('@/assets/images/placeholderImage.png')}/>
+                    <Image style={{ height: 100, width: 100 }} className='rounded-[5px] shadow-md' resizeMode='stretch' source={item?.imageURL ? { uri: item?.imageURL } : require('@/assets/images/placeholderImage.png')} />
                     <View className='h-full justify-between ml-[5px] flex-1' >
-                        <View className='flex-row justify-between items-center' >
+                      <View className='flex-row justify-between items-center' >
                         <Text>{item?.name}</Text>
                         {item?.variantName && item?.variantName !== '' && <Text className='p-[2px] border border-primary rounded-[5px]' >{item?.variantName}</Text>}
-                        </View>
-                        <View className='flex-row justify-between items-center' >
-                        <Text>MRP: {item?.price?.[0]?.mrp}</Text>
+                      </View>
+                      <View className='flex-row justify-between items-center' >
+                        <Text>MRP: ₹{item?.price?.[0]?.mrp}</Text>
                         <Text>QTY: {item?.quantity}</Text>
-                        </View>
-                        <View className='flex-row justify-between items-center' >
-                        <Text>{item?.price?.[0]?.sellingPrice}/{item?.price?.[0]?.measurement}</Text>
-                        <Text>Sub Total: {Number(item?.price?.[0]?.sellingPrice) * Number(item?.quantity)}</Text>
-                        </View>
+                      </View>
+                      <View className='flex-row justify-between items-center' >
+                        <Text>₹{item?.price?.[0]?.sellingPrice}/{item?.price?.[0]?.measurement}</Text>
+                        <Text>Sub Total: ₹{Number(item?.price?.[0]?.sellingPrice) * Number(item?.quantity)}</Text>
+                      </View>
                     </View>
                   </View>
                 )}
@@ -1674,6 +2161,145 @@ export default function Home() {
           </View>
         </Modal>
       )}
+
+      {/* Custom Range Modal */}
+      <Modal animationType="slide" transparent={true} visible={isCustomRangeModalVisible}>
+        <View className='p-[10px] h-full w-full bg-[#00000060] items-center justify-center'>
+          <View className='h-[580px] w-full max-w-md rounded-[5px] bg-white p-[10px]'>
+
+            <Text className='text-[20px] text-primary font-bold text-center mb-4'>
+              Select Custom Date Range
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => setIsCustomRangeModalVisible(false)}
+              className='absolute top-[10px] right-[10px] z-50'
+            >
+              <Image source={require('@/assets/images/crossImage.png')} style={{ height: 30, width: 30 }} />
+            </TouchableOpacity>
+
+            {/* Calendar */}
+            <View className="flex-1 mt-4">
+              <Calendar
+                current={customEndDate?.toISOString().split('T')[0]}
+                minDate={'2020-01-01'} // optional: set your earliest allowed date
+                maxDate={new Date().toISOString().split('T')[0]} // today as max
+
+                // Mark selected range
+                markedDates={{
+                  ...(customStartDate && {
+                    [customStartDate.toISOString().split('T')[0]]: {
+                      selected: true,
+                      startingDay: true,
+                      color: '#00adf5',
+                      textColor: '#ffffff',
+                    },
+                  }),
+                  ...(customEndDate && {
+                    [customEndDate.toISOString().split('T')[0]]: {
+                      selected: true,
+                      endingDay: true,
+                      color: '#00adf5',
+                      textColor: '#ffffff',
+                    },
+                  }),
+                  ...getDatesInRange(customStartDate, customEndDate),
+                }}
+
+                // Allow range selection
+                onDayPress={(day) => {
+                  const selectedDate = new Date(day.dateString);
+
+                  if (!customStartDate) {
+                    // First selection - set both start and end to same date
+                    setCustomStartDate(selectedDate);
+                    setCustomEndDate(selectedDate);
+                  } else if (!customEndDate && selectedDate >= customStartDate) {
+                    // Second selection - valid end date
+                    setCustomEndDate(selectedDate);
+                  } else {
+                    // Reset selection
+                    setCustomStartDate(selectedDate);
+                    setCustomEndDate(null);
+                  }
+                }}
+
+                // Styling
+                theme={{
+                  selectedDayBackgroundColor: '#00adf5',
+                  selectedDayTextColor: '#ffffff',
+                  todayTextColor: '#00adf5',
+                  arrowColor: '#00adf5',
+                  monthTextColor: '#00adf5',
+                  textDayFontWeight: '500',
+                  textMonthFontWeight: 'bold',
+                  textDayHeaderFontWeight: '600',
+                }}
+
+                enableSwipeMonths={true}
+                hideExtraDays={true}
+              />
+
+              {/* Show selected range below calendar */}
+              <View className="mt-4 px-4">
+                <Text className="text-sm text-gray-600">
+                  From: <Text className="font-bold">{customStartDate?.toDateString()}</Text>
+                </Text>
+                <Text className="text-sm text-gray-600 mt-1">
+                  To: <Text className="font-bold">{customEndDate?.toDateString()}</Text>
+                </Text>
+              </View>
+            </View>
+
+            {/* Quick Range Buttons */}
+            <View className="flex-row justify-between mt-4">
+              <TouchableOpacity
+                onPress={() => {
+                  const end = new Date();
+                  const start = new Date();
+                  start.setDate(start.getDate() - 7);
+                  setCustomStartDate(start);
+                  setCustomEndDate(end);
+                }}
+                className="bg-blue-100 p-3 rounded-[5px] flex-1 mr-1"
+              >
+                <Text className="text-center text-blue-800 font-medium">Last 7 Days</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  const end = new Date();
+                  const start = new Date();
+                  start.setDate(start.getDate() - 30);
+                  setCustomStartDate(start);
+                  setCustomEndDate(end);
+                }}
+                className="bg-blue-100 p-3 rounded-[5px] flex-1 ml-1"
+              >
+                <Text className="text-center text-blue-800 font-medium">Last 30 Days</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Action Buttons */}
+            <View className="flex-row justify-between mt-4">
+              <TouchableOpacity
+                onPress={() => setIsCustomRangeModalVisible(false)}
+                className="bg-primaryRed p-4 rounded-[5px] flex-1 mr-2"
+              >
+                <Text className="text-white text-center font-bold">Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setSelectedTimeFilter('custom');
+                  setIsCustomRangeModalVisible(false);
+                }}
+                className="bg-primaryGreen p-4 rounded-[5px] flex-1 ml-2"
+              >
+                <Text className="text-white text-center font-bold">Apply Filter</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
