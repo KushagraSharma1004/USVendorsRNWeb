@@ -672,7 +672,7 @@ export default function Home() {
               {/* Clear Selection Button - Smaller */}
                 <TouchableOpacity
                   onPress={() => setOrdersToSummarize({})}
-                  className="bg-primaryRed p-[10px] rounded-[5px] absolute top-[0px] right-[0px]"
+                  className="bg-primaryRed p-[10px] rounded-[5px] absolute top-[0px] right-[0px] z-50"
                 >
                   <Text className="text-white text-center">Clear Selection</Text>
                 </TouchableOpacity>
@@ -748,7 +748,7 @@ export default function Home() {
                 {/* Header Row */}
                 <View className='flex-row bg-[#f0f0f0] sticky top-[0px] z-50 gap-[4px]'>
                   <Text className='text-center w-[40px] text-[12px] bg-black text-white py-[5px]' >SR no.</Text>
-                  <Text className='text-center w-[160px] text-[12px] bg-black text-white py-[5px]' >Order Id</Text>
+                  <Text className='text-center w-[165px] text-[12px] bg-black text-white py-[5px]' >Order Id</Text>
                   <Text className='text-center w-[60px] text-[12px] bg-black text-white py-[5px]' >Status</Text>
                   <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Items</Text>
                   <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Total</Text>
@@ -763,7 +763,7 @@ export default function Home() {
                   {vendorOrders.map((order, index) => (
                     <TouchableOpacity key={order.id} onPress={() => setOrdersToSummarize(prev => prev[order.id] ? (() => { const { [order.id]: removed, ...rest } = prev; return rest; })() : { ...prev, [order.id]: order })} className={`flex-row gap-[4px] py-1 border-b border-gray-200 ${ordersToSummarize[order.id] ? 'bg-blue-100' : ''}`}>
                       <Text className='text-center w-[40px] text-[12px] py-[5px]'>{vendorOrders?.length - index}</Text>
-                      <Text className='text-center w-[160px] text-[12px] py-[5px]'>{order?.id}</Text>
+                      <Text className='text-center w-[165px] text-[12px] py-[5px]'>{order?.id}</Text>
                       <Text className={`text-center w-[60px] text-[12px] py-[5px] ${order?.orderStatus === 'Pending' ? 'bg-primaryYellow' : order?.orderStatus === 'Approved' ? 'bg-primaryGreen text-white' : 'bg-primaryRed text-white'}`}>{order?.orderStatus || 'Pending'}</Text>
                       <Text className='text-center w-[80px] text-[12px] py-[5px]'>{order?.items?.reduce((total, item) => { const quantity = Number(item?.quantity) || 0; return total + quantity; }, 0) || '0'}</Text>
                       <Text className='text-center w-[80px] text-[12px] py-[5px]'>₹{Number(order?.totalAmount).toFixed(2) || '0'}</Text>
