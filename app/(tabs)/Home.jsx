@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, FlatList, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, TextInput, Modal, FlatList } from 'react-native';
 import { collection, addDoc, arrayUnion, updateDoc, doc, getDocs } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useAuth } from '../context/AuthContext'
@@ -44,7 +44,8 @@ export default function Home() {
   const [nextEditField, setNextEditField] = useState(null);
   const [vendorOrders, setVendorOrders] = useState([]);
   const [ordersToSummarize, setOrdersToSummarize] = useState({})
-
+  const [selectedOrderStatus, setSelectedOrderStatus] = useState('Pending')
+  const [isTotalItemsListModalVisible, setIsTotalItemsListModalVisible] = useState(false)
   const fetchVendorItemsList = async () => {
     try {
       const vendorItemsRef = collection(db, 'users', vendorMobileNumber, 'list')
@@ -557,7 +558,7 @@ export default function Home() {
   return (
     <View>
 
-      <ScrollView showsHorizontalScrollIndicator={false} contentContainerClassName="gap-[2px]" className="w-full max-h-[100px]" horizontal>
+      <ScrollView showsHorizontalScrollIndicator={false} contentContainerClassName="gap-[2px]" className="w-full max-h-[70px]" horizontal>
         {/* Sales */}
         <TouchableOpacity
           onPress={() => toggleSection(Section.SALES)}
@@ -669,10 +670,10 @@ export default function Home() {
           <View className='flex-1' >
             {Object.keys(ordersToSummarize).length > 0 && (
               <>
-              {/* Clear Selection Button - Smaller */}
+                {/* Clear Selection Button - Smaller */}
                 <TouchableOpacity
                   onPress={() => setOrdersToSummarize({})}
-                  className="bg-primaryRed p-[10px] rounded-[5px] absolute top-[0px] right-[0px] z-50"
+                  className="bg-primaryRed p-[5px] rounded-[5px] absolute top-[5px] right-[0px] z-50"
                 >
                   <Text className="text-white text-center">Clear Selection</Text>
                 </TouchableOpacity>
@@ -685,13 +686,13 @@ export default function Home() {
                     <Text className="text-[18px] font-bold text-blue-600">{Object.keys(ordersToSummarize).length}</Text>
                   </View>
 
-                  <View className="bg-white p-[5px] rounded-[5px] min-w-[100px] items-center border border-gray-200">
+                  <TouchableOpacity onPress={() => setIsTotalItemsListModalVisible(true)} className="bg-white p-[5px] rounded-[5px] min-w-[100px] items-center border border-gray-200">
                     <Text className="text-[10px] font-medium text-gray-600 mb-1">Total Items</Text>
                     <Text className="text-[18px] font-bold text-purple-600">
                       {Object.values(ordersToSummarize).reduce((total, order) =>
                         total + (order?.items?.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0) || 0), 0)}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
 
                   <View className="bg-white p-[5px] rounded-[5px] min-w-[100px] items-center border border-gray-200">
                     <Text className="text-[10px] font-medium text-gray-600 mb-1">Grand Total</Text>
@@ -712,38 +713,82 @@ export default function Home() {
                         }, 0) || 0), 0).toFixed(2)}
                     </Text>
                   </View>
-                </ScrollView>
 
-                {/* Additional Summary Details - Compact */}
-                <View className="bg-white mt-[5px] p-[5px] rounded-[5px] border border-gray-200 w-[95%] self-center">
-                  <Text className="text-[12px] font-bold mb-1">Breakdown:</Text>
-                  <View className="flex-row justify-between mb-1">
-                    <Text className="text-[10px] text-gray-600">Delivery Charges:</Text>
-                    <Text className="text-[10px] text-red-600 font-medium">
+                  <View className="bg-white p-[5px] rounded-[5px] min-w-[100px] items-center border border-gray-200">
+                    <Text className="text-[10px] font-medium text-gray-600 mb-1">Delivery Charges</Text>
+                    <Text className="text-[16px] font-bold text-orange-600">
                       ₹{Object.values(ordersToSummarize).reduce((total, order) =>
                         total + (Number(order?.deliveryCharge) || 0), 0).toFixed(2)}
                     </Text>
                   </View>
-                  <View className="flex-row justify-between mb-1">
-                    <Text className="text-[10px] text-gray-600">Discounts:</Text>
-                    <Text className="text-[10px] text-green-600 font-medium">
+
+                  <View className="bg-white p-[5px] rounded-[5px] min-w-[100px] items-center border border-gray-200">
+                    <Text className="text-[10px] font-medium text-gray-600 mb-1">Discounts</Text>
+                    <Text className="text-[16px] font-bold text-green-600">
                       ₹{Object.values(ordersToSummarize).reduce((total, order) =>
                         total + (Number(order?.totalDiscount) || 0), 0).toFixed(2)}
                     </Text>
                   </View>
-                  <View className="flex-row justify-between">
-                    <Text className="text-[10px] text-gray-600">Avg. Order Value:</Text>
-                    <Text className="text-[10px] font-medium">
+
+                  <View className="bg-white p-[5px] rounded-[5px] min-w-[100px] items-center border border-gray-200">
+                    <Text className="text-[10px] font-medium text-gray-600 mb-1">Avg. Order Value</Text>
+                    <Text className="text-[16px] font-bold text-primary">
                       ₹{(Object.values(ordersToSummarize).reduce((total, order) =>
                         total + (Number(order?.totalAmount) || 0), 0) / (Object.keys(ordersToSummarize).length || 1)).toFixed(2)}
                     </Text>
                   </View>
-                </View>
+                </ScrollView>
               </>
             )}
+
+            <View className='p-[5px] w-full py-[5px] flex-row gap-[5px]' >
+              <TouchableOpacity onPress={() => setSelectedOrderStatus('Pending')} className='bg-primaryYellow items-center justify-center flex-1 pb-[2px] rounded-[5px]' >
+                {selectedOrderStatus === 'Pending' ? (
+                  <Text className='font-bold'>Pending</Text>
+                ) : (
+                  <>
+                    <Text className='bg-white px-[5px] absolute top-[-5px] rounded-[5px] text-[10px]' >Pending</Text>
+                    <Text className='font-bold mt-[8px] text-[20px]' >{vendorOrders?.filter((order) => order?.orderStatus === 'Pending')?.length || 0}</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setSelectedOrderStatus('Approved')} className='bg-primaryGreen items-center justify-center flex-1 pb-[2px] rounded-[5px]' >
+                {selectedOrderStatus === 'Approved' ? (
+                  <Text className='font-bold'>Approved</Text>
+                ) : (
+                  <>
+                    <Text className='bg-white px-[5px] absolute top-[-5px] rounded-[5px] text-[10px]' >Approved</Text>
+                    <Text className='font-bold mt-[8px] text-[20px]' >{vendorOrders?.filter((order) => order?.orderStatus === 'Approved')?.length || 0}</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setSelectedOrderStatus('Rejected')} className='bg-primaryRed items-center justify-center flex-1 pb-[2px] rounded-[5px]' >
+                {selectedOrderStatus === 'Rejected' ? (
+                  <Text className='font-bold text-white'>Rejected</Text>
+                ) : (
+                  <>
+                    <Text className='bg-white px-[5px] absolute top-[-5px] rounded-[5px] text-[10px]' >Rejected</Text>
+                    <Text className='font-bold mt-[8px] text-[20px] text-white' >{vendorOrders?.filter((order) => order?.orderStatus === 'Rejected')?.length || 0}</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setSelectedOrderStatus('All')} className='bg-white items-center justify-center flex-1 pb-[2px] rounded-[5px]' >
+                {selectedOrderStatus === 'All' ? (
+                  <Text className='font-bold'>All</Text>
+                ) : (
+                  <>
+                    <Text className='bg-white px-[5px] absolute top-[-5px] rounded-[5px] text-[10px]' >All</Text>
+                    <Text className='font-bold mt-[8px] text-[20px]' >{vendorOrders?.length || 0}</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity className=''>
+                <Image source={require('@/assets/images/sortImage.png')} style={{ width: 30, height: 30 }} className='w-[20px] h-[20px]' />
+              </TouchableOpacity>
+            </View>
+
             <ScrollView nestedScrollEnabled={true} horizontal={true}>
               <View style={{ flex: 1 }}>
-                {/* {isBulkEditingLoaderVisible && <Loader />} */}
 
                 {/* Header Row */}
                 <View className='flex-row bg-[#f0f0f0] sticky top-[0px] z-50 gap-[4px]'>
@@ -759,10 +804,10 @@ export default function Home() {
                 </View>
 
                 {/* Data Rows */}
-                <ScrollView nestedScrollEnabled={true} style={{ height: 'calc(100vh - 200px)' }} >
-                  {vendorOrders.map((order, index) => (
+                <ScrollView nestedScrollEnabled={true} style={{ height: Object.keys(ordersToSummarize).length > 0 ? 'calc(100vh - 350px)' : 'calc(100vh - 260px)' }} >
+                  {vendorOrders?.filter((order) => selectedOrderStatus === 'Pending' ? order?.orderStatus === 'Pending' : selectedOrderStatus === 'Approved' ? order?.orderStatus === 'Approved' : selectedOrderStatus === 'Rejected' ? order?.orderStatus === 'Rejected' : true).map((order, index) => (
                     <TouchableOpacity key={order.id} onPress={() => setOrdersToSummarize(prev => prev[order.id] ? (() => { const { [order.id]: removed, ...rest } = prev; return rest; })() : { ...prev, [order.id]: order })} className={`flex-row gap-[4px] py-1 border-b border-gray-200 ${ordersToSummarize[order.id] ? 'bg-blue-100' : ''}`}>
-                      <Text className='text-center w-[40px] text-[12px] py-[5px]'>{vendorOrders?.length - index}</Text>
+                      <Text className='text-center w-[40px] text-[12px] py-[5px]'>{(selectedOrderStatus === 'Pending' ? vendorOrders?.filter((order) => order?.orderStatus === 'Pending')?.length : selectedOrderStatus === 'Approved' ? vendorOrders?.filter((order) => order?.orderStatus === 'Approved')?.length : selectedOrderStatus === 'Rejected' ? vendorOrders?.filter((order) => order?.orderStatus === 'Rejected')?.length : vendorOrders?.length) - index}</Text>
                       <Text className='text-center w-[165px] text-[12px] py-[5px]'>{order?.id}</Text>
                       <Text className={`text-center w-[60px] text-[12px] py-[5px] ${order?.orderStatus === 'Pending' ? 'bg-primaryYellow' : order?.orderStatus === 'Approved' ? 'bg-primaryGreen text-white' : 'bg-primaryRed text-white'}`}>{order?.orderStatus || 'Pending'}</Text>
                       <Text className='text-center w-[80px] text-[12px] py-[5px]'>{order?.items?.reduce((total, item) => { const quantity = Number(item?.quantity) || 0; return total + quantity; }, 0) || '0'}</Text>
@@ -1556,6 +1601,79 @@ export default function Home() {
           </View>
         </View>
       )}
-    </View >
+
+      {isTotalItemsListModalVisible && (
+        <Modal animationType={'slide'} transparent={true} visible={isTotalItemsListModalVisible}>
+          <View className='p-[10px] h-full w-full bg-[#00000060] items-center justify-center'>
+            <View className='h-full w-full rounded-[5px] bg-white p-[10px]'>
+              <Text className='text-[24px] text-primary font-bold text-center'>Selected Items Summary</Text>
+              <TouchableOpacity onPress={() => setIsTotalItemsListModalVisible(false)} className='absolute top-[10px] right-[10px] z-50'>
+                <Image source={require('@/assets/images/crossImage.png')} style={{ height: 30, width: 30 }} />
+              </TouchableOpacity>
+
+              {/* Header for items list */}
+              <View className="flex-row justify-between items-center p-2 bg-gray-100 border-b border-gray-300">
+                <Text className="font-bold flex-1">Item Details</Text>
+                <Text className="font-bold ml-4 w-[60px] text-center">
+                  Total Qty ({Object.values(ordersToSummarize).reduce((total, order) =>
+                    total + (order?.items?.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0) || 0), 0)
+                  })
+                </Text>
+              </View>
+
+              <FlatList
+                data={(() => {
+                  // Create an object to aggregate items by their unique properties
+                  const aggregatedItems = {};
+
+                  Object.values(ordersToSummarize).forEach(order => {
+                    order.items?.forEach(item => {
+                      // Create a unique key based on all properties that should match
+                      const key = `${item.name}-${item.price?.[0]?.measurement}-${item.price?.[0]?.sellingPrice}-${item.variantName || ''}`;
+
+                      if (aggregatedItems[key]) {
+                        // If item already exists, increment quantity
+                        aggregatedItems[key].quantity += Number(item.quantity) || 0;
+                      } else {
+                        // If item doesn't exist, add it
+                        aggregatedItems[key] = {
+                          ...item,
+                          quantity: Number(item.quantity) || 0
+                        };
+                      }
+                    });
+                  });
+
+                  return Object.values(aggregatedItems).sort((a, b) => a?.name?.localeCompare(b?.name));
+                })()}
+                keyExtractor={(item, index) => index.toString()}
+                renderItem={({ item, index }) => (
+                  <View className='bg-white rounded-[5px] p-[10px] w-full flex-row h-[120px] border' >
+                    <Image style={{height:100, width: 100}} className='rounded-[5px] shadow-md' resizeMode='stretch' source={item?.imageURL ? {uri: item?.imageURL} : require('@/assets/images/placeholderImage.png')}/>
+                    <View className='h-full justify-between ml-[5px] flex-1' >
+                        <View className='flex-row justify-between items-center' >
+                        <Text>{item?.name}</Text>
+                        {item?.variantName && item?.variantName !== '' && <Text className='p-[2px] border border-primary rounded-[5px]' >{item?.variantName}</Text>}
+                        </View>
+                        <View className='flex-row justify-between items-center' >
+                        <Text>MRP: {item?.price?.[0]?.mrp}</Text>
+                        <Text>QTY: {item?.quantity}</Text>
+                        </View>
+                        <View className='flex-row justify-between items-center' >
+                        <Text>{item?.price?.[0]?.sellingPrice}/{item?.price?.[0]?.measurement}</Text>
+                        <Text>Sub Total: {Number(item?.price?.[0]?.sellingPrice) * Number(item?.quantity)}</Text>
+                        </View>
+                    </View>
+                  </View>
+                )}
+                ListEmptyComponent={
+                  <Text className="text-center text-gray-500 p-4">No items in selected orders</Text>
+                }
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
+    </View>
   );
 }
