@@ -8,7 +8,7 @@ import Loader from '../components/Loader'
 export default function Home() {
   const { vendorMobileNumber } = useAuth()
   const Section = {
-    SALES:'sales',
+    SALES: 'sales',
     BULKEDIT: 'bulkedit',
     SERVICEAREAFENCING: 'serviceareafencing',
     DELIVERYMODES: 'deliverymodes',
@@ -42,6 +42,8 @@ export default function Home() {
   const [pendingChanges, setPendingChanges] = useState({});
   const [showSaveAlert, setShowSaveAlert] = useState(false);
   const [nextEditField, setNextEditField] = useState(null);
+  const [vendorOrders, setVendorOrders] = useState([]);
+  const [ordersToSummarize, setOrdersToSummarize] = useState({})
 
   const fetchVendorItemsList = async () => {
     try {
@@ -70,9 +72,63 @@ export default function Home() {
     }
   };
 
+  const fetchVendorOrders = async () => {
+    try {
+
+      // First, get all customers
+      const customersRef = collection(db, 'customers');
+      const customersSnapshot = await getDocs(customersRef);
+
+      const allOrders = [];
+
+      // Loop through each customer and check their orders
+      for (const customerDoc of customersSnapshot.docs) {
+        const customerMobileNumber = customerDoc.id;
+
+        try {
+          // Get the myOrders subcollection for this customer
+          const ordersRef = collection(db, 'customers', customerMobileNumber, 'myOrders');
+          const ordersSnapshot = await getDocs(ordersRef);
+
+          // Filter orders that match the current vendor's mobile number
+          const vendorOrdersFromCustomer = ordersSnapshot.docs
+            .map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+              customerMobileNumber // Include customer info for reference
+            }))
+            .filter(order => order.vendorMobileNumber === vendorMobileNumber);
+
+          allOrders.push(...vendorOrdersFromCustomer);
+        } catch (error) {
+          console.log(`Error fetching orders for customer ${customerMobileNumber}:`, error);
+          // Continue with other customers even if one fails
+          continue;
+        }
+      }
+
+      // Sort orders by timestamp (newest first) or any other criteria
+      const sortedOrders = allOrders.sort((a, b) => {
+        const timeA = a.orderTime?.toDate?.() || new Date(a.timestamp || 0);
+        const timeB = b.orderTime?.toDate?.() || new Date(b.timestamp || 0);
+        return timeB - timeA;
+      });
+
+      setVendorOrders(sortedOrders);
+
+    } catch (err) {
+      console.error('Error fetching orders: ', err);
+      alert('Error fetching orders. Please try again.');
+    } finally {
+    }
+  }
+
   useEffect(() => {
     fetchVendorItemsList()
     fetchVendorCategories()
+    if (vendorMobileNumber) {
+      fetchVendorOrders();
+    }
   }, [vendorMobileNumber])
 
   const generateVariantId = (indexORName = 0) => {
@@ -467,36 +523,36 @@ export default function Home() {
   }, []);
 
   const handleDeleteVariant = async (baseItem, variant) => {
-  // Show confirmation dialog for web
-  const isConfirmed = window.confirm(
-    `Are you sure you want to delete "${variant.variantName}"?`
-  );
+    // Show confirmation dialog for web
+    const isConfirmed = window.confirm(
+      `Are you sure you want to delete "${variant.variantName}"?`
+    );
 
-  if (!isConfirmed) return;
+    if (!isConfirmed) return;
 
-  setIsBulkEditingLoaderVisible(true);
-  try {
-    const itemRef = doc(db, 'users', vendorMobileNumber, 'list', baseItem.id);
-    
-    // Filter out the variant to be deleted
-    const updatedVariants = baseItem.variants.filter(v => v.id !== variant.id);
-    
-    // Update Firestore with the filtered variants array
-    await updateDoc(itemRef, {
-      variants: updatedVariants
-    });
+    setIsBulkEditingLoaderVisible(true);
+    try {
+      const itemRef = doc(db, 'users', vendorMobileNumber, 'list', baseItem.id);
 
-    // Refresh the data
-    await fetchVendorItemsList();
-    
-    alert('Variant deleted successfully!');
-  } catch (error) {
-    console.error('Error deleting variant:', error);
-    alert('Error: Failed to delete variant. Please try again.');
-  } finally {
-    setIsBulkEditingLoaderVisible(false);
+      // Filter out the variant to be deleted
+      const updatedVariants = baseItem.variants.filter(v => v.id !== variant.id);
+
+      // Update Firestore with the filtered variants array
+      await updateDoc(itemRef, {
+        variants: updatedVariants
+      });
+
+      // Refresh the data
+      await fetchVendorItemsList();
+
+      alert('Variant deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting variant:', error);
+      alert('Error: Failed to delete variant. Please try again.');
+    } finally {
+      setIsBulkEditingLoaderVisible(false);
+    }
   }
-}
 
   return (
     <View>
@@ -509,7 +565,7 @@ export default function Home() {
           <Text className="font-bold text-primary text-[16px] text-center" >Sales</Text>
           {/* <Text className="font-bold text-primary text-[16px] text-center" >({allVendorsList?.length || 0})</Text> */}
         </TouchableOpacity>
-        
+
         {/* Bulk Editing */}
         <TouchableOpacity
           onPress={() => toggleSection(Section.BULKEDIT)}
@@ -610,8 +666,120 @@ export default function Home() {
 
       <View className='flex-1'>
         {activeSection === 'sales' && (
-          <View>
+          <View className='flex-1' >
+            {Object.keys(ordersToSummarize).length > 0 && (
+              <>
+              {/* Clear Selection Button - Smaller */}
+                <TouchableOpacity
+                  onPress={() => setOrdersToSummarize({})}
+                  className="bg-primaryRed p-[10px] rounded-[5px] absolute top-[0px] right-[0px]"
+                >
+                  <Text className="text-white text-center">Clear Selection</Text>
+                </TouchableOpacity>
+                <Text className="text-[16px] font-bold text-center p-[10px]">Order Summary</Text>
 
+                {/* Summary Stats in horizontal scroll */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 5, gap: 5 }}>
+                  <View className="bg-white p-[5px] rounded-[5px] min-w-[100px] items-center border border-gray-200">
+                    <Text className="text-[10px] font-medium text-gray-600 mb-1">Selected Orders</Text>
+                    <Text className="text-[18px] font-bold text-blue-600">{Object.keys(ordersToSummarize).length}</Text>
+                  </View>
+
+                  <View className="bg-white p-[5px] rounded-[5px] min-w-[100px] items-center border border-gray-200">
+                    <Text className="text-[10px] font-medium text-gray-600 mb-1">Total Items</Text>
+                    <Text className="text-[18px] font-bold text-purple-600">
+                      {Object.values(ordersToSummarize).reduce((total, order) =>
+                        total + (order?.items?.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0) || 0), 0)}
+                    </Text>
+                  </View>
+
+                  <View className="bg-white p-[5px] rounded-[5px] min-w-[100px] items-center border border-gray-200">
+                    <Text className="text-[10px] font-medium text-gray-600 mb-1">Grand Total</Text>
+                    <Text className="text-[16px] font-bold text-green-600">
+                      ₹{Object.values(ordersToSummarize).reduce((total, order) =>
+                        total + (Number(order?.totalAmount) || 0), 0).toFixed(2)}
+                    </Text>
+                  </View>
+
+                  <View className="bg-white p-[5px] rounded-[5px] min-w-[100px] items-center border border-gray-200">
+                    <Text className="text-[10px] font-medium text-gray-600 mb-1">Sub Total</Text>
+                    <Text className="text-[16px] font-bold text-orange-600">
+                      ₹{Object.values(ordersToSummarize).reduce((total, order) =>
+                        total + (order?.items?.reduce((sum, item) => {
+                          const sellingPrice = Number(item?.price?.[0]?.sellingPrice) || 0;
+                          const quantity = Number(item?.quantity) || 0;
+                          return sum + (sellingPrice * quantity);
+                        }, 0) || 0), 0).toFixed(2)}
+                    </Text>
+                  </View>
+                </ScrollView>
+
+                {/* Additional Summary Details - Compact */}
+                <View className="bg-white mt-[5px] p-[5px] rounded-[5px] border border-gray-200 w-[95%] self-center">
+                  <Text className="text-[12px] font-bold mb-1">Breakdown:</Text>
+                  <View className="flex-row justify-between mb-1">
+                    <Text className="text-[10px] text-gray-600">Delivery Charges:</Text>
+                    <Text className="text-[10px] text-red-600 font-medium">
+                      ₹{Object.values(ordersToSummarize).reduce((total, order) =>
+                        total + (Number(order?.deliveryCharge) || 0), 0).toFixed(2)}
+                    </Text>
+                  </View>
+                  <View className="flex-row justify-between mb-1">
+                    <Text className="text-[10px] text-gray-600">Discounts:</Text>
+                    <Text className="text-[10px] text-green-600 font-medium">
+                      ₹{Object.values(ordersToSummarize).reduce((total, order) =>
+                        total + (Number(order?.totalDiscount) || 0), 0).toFixed(2)}
+                    </Text>
+                  </View>
+                  <View className="flex-row justify-between">
+                    <Text className="text-[10px] text-gray-600">Avg. Order Value:</Text>
+                    <Text className="text-[10px] font-medium">
+                      ₹{(Object.values(ordersToSummarize).reduce((total, order) =>
+                        total + (Number(order?.totalAmount) || 0), 0) / (Object.keys(ordersToSummarize).length || 1)).toFixed(2)}
+                    </Text>
+                  </View>
+                </View>
+              </>
+            )}
+            <ScrollView nestedScrollEnabled={true} horizontal={true}>
+              <View style={{ flex: 1 }}>
+                {/* {isBulkEditingLoaderVisible && <Loader />} */}
+
+                {/* Header Row */}
+                <View className='flex-row bg-[#f0f0f0] sticky top-[0px] z-50 gap-[4px]'>
+                  <Text className='text-center w-[40px] text-[12px] bg-black text-white py-[5px]' >SR no.</Text>
+                  <Text className='text-center w-[160px] text-[12px] bg-black text-white py-[5px]' >Order Id</Text>
+                  <Text className='text-center w-[60px] text-[12px] bg-black text-white py-[5px]' >Status</Text>
+                  <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Items</Text>
+                  <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Total</Text>
+                  <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Sub Total</Text>
+                  <Text className='text-center w-[100px] text-[12px] bg-black text-white py-[5px]' >Delivery Charge</Text>
+                  <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Offer</Text>
+                  <Text className='text-center w-[130px] text-[12px] bg-black text-white py-[5px]' >Time</Text>
+                </View>
+
+                {/* Data Rows */}
+                <ScrollView nestedScrollEnabled={true} style={{ height: 'calc(100vh - 200px)' }} >
+                  {vendorOrders.map((order, index) => (
+                    <TouchableOpacity key={order.id} onPress={() => setOrdersToSummarize(prev => prev[order.id] ? (() => { const { [order.id]: removed, ...rest } = prev; return rest; })() : { ...prev, [order.id]: order })} className={`flex-row gap-[4px] py-1 border-b border-gray-200 ${ordersToSummarize[order.id] ? 'bg-blue-100' : ''}`}>
+                      <Text className='text-center w-[40px] text-[12px] py-[5px]'>{vendorOrders?.length - index}</Text>
+                      <Text className='text-center w-[160px] text-[12px] py-[5px]'>{order?.id}</Text>
+                      <Text className={`text-center w-[60px] text-[12px] py-[5px] ${order?.orderStatus === 'Pending' ? 'bg-primaryYellow' : order?.orderStatus === 'Approved' ? 'bg-primaryGreen text-white' : 'bg-primaryRed text-white'}`}>{order?.orderStatus || 'Pending'}</Text>
+                      <Text className='text-center w-[80px] text-[12px] py-[5px]'>{order?.items?.reduce((total, item) => { const quantity = Number(item?.quantity) || 0; return total + quantity; }, 0) || '0'}</Text>
+                      <Text className='text-center w-[80px] text-[12px] py-[5px]'>₹{Number(order?.totalAmount).toFixed(2) || '0'}</Text>
+                      <Text className='text-center w-[80px] text-[12px] py-[5px]'>₹{order?.items?.reduce((total, item) => { const sellingPrice = Number(item?.price?.[0]?.sellingPrice) || 0; const quantity = Number(item?.quantity) || 0; return total + (sellingPrice * quantity); }, 0).toFixed(2) || '0'}</Text>
+                      <Text className={`text-center w-[100px] text-[12px] py-[5px] ${(order?.deliveryCharge || '0') !== '0' ? 'text-primaryRed' : ''}`}>₹{order?.deliveryCharge || '0'}</Text>
+                      <Text className={`text-center w-[80px] text-[12px] py-[5px] ${(order?.totalDiscount || 0) !== 0 ? 'text-primaryGreen' : ''}`}>₹{order?.totalDiscount || '0'}</Text>
+                      <Text className={`text-center w-[130px] text-[12px] py-[5px]`}>{order?.orderTime?.toDate()?.toLocaleString() || 'No time'}</Text>
+                    </TouchableOpacity>
+                  ))}
+
+                  {vendorOrders.length === 0 && !isBulkEditingLoaderVisible && (
+                    <Text className="text-center py-4 text-gray-500">No orders found</Text>
+                  )}
+                </ScrollView>
+              </View>
+            </ScrollView>
           </View>
         )}
         {activeSection === 'bulkedit' && (
@@ -701,7 +869,7 @@ export default function Home() {
                         <Loader />
                       )}
                       {/* Header Row */}
-                      <View style={{ flexDirection: 'row', backgroundColor: '#f0f0f0', position: 'sticky', top: 0, zIndex: 1, gap: 4 }}>
+                      <View className='flex-row bg-[#f0f0f0] sticky top-[0px] z-50 gap-[4px]'>
                         <Text className='text-center w-[120px] text-[12px] bg-black text-white py-[5px]' >Category</Text>
                         <Text className='text-center w-[150px] text-[12px] bg-black text-white py-[5px]' >Item Name</Text>
                         <Text className='text-center w-[150px] text-[12px] bg-black text-white py-[5px]' >Variant Name</Text>
@@ -1056,7 +1224,7 @@ export default function Home() {
                                                     keyboardType="numeric"
                                                     onSave={handleSaveField}
                                                   />
-                                                        <TouchableOpacity className='py-[5px] px-[10px] bg-primaryRed border border-[#ffffff]' onPress={() => handleDeleteVariant(item, variant)}><Text className='text-center text-white' >Delete</Text></TouchableOpacity>
+                                                  <TouchableOpacity className='py-[5px] px-[10px] bg-primaryRed border border-[#ffffff]' onPress={() => handleDeleteVariant(item, variant)}><Text className='text-center text-white' >Delete</Text></TouchableOpacity>
                                                 </View>
                                               ))}
                                               {addNewVariantSectionVisibleFor === item?.id && (
