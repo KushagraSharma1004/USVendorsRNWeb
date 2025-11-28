@@ -3563,9 +3563,9 @@ export default function Home() {
                     });
 
                     // Convert to array and render
-                    return Object.values(aggregatedItems).map((item) => (
+                    return Object.values(aggregatedItems).sort((a, b) => a?.name?.localeCompare(b?.name)).map((item, index) => (
                       <View key={`${item.name}-${item.variantName || ''}-${item.index}`} className='mb-[2px] flex-row gap-[5px] w-full'>
-                        <Text className='text-[13px]'>{item.index}.</Text>
+                        <Text className='text-[13px]'>{index + 1}.</Text>
                         <Text className='flex-1 text-[13px]'>
                           {item.name}{' '}
                           <Text className='text-[10px]'>
