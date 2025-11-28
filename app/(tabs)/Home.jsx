@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, Image, TextInput, Modal, FlatList } from 'react-native';
 import { collection, addDoc, arrayUnion, updateDoc, doc, getDocs } from 'firebase/firestore'
 import { db } from '@/firebase'
@@ -6,9 +6,10 @@ import { useAuth } from '../context/AuthContext'
 import Loader from '../components/Loader'
 import { Calendar, DateObject } from 'react-native-calendars';
 import { LocaleConfig } from 'react-native-calendars';
+import { toPng } from 'html-to-image';
 
 export default function Home() {
-  const { vendorMobileNumber } = useAuth()
+  const { vendorMobileNumber, vendorFullData } = useAuth()
   const Section = {
     SALES: 'sales',
     BULKEDIT: 'bulkedit',
@@ -68,6 +69,9 @@ export default function Home() {
   const [orderToShowItemsFor, setOrderToShowItemsFor] = useState([])
   const [isOrderActionModalVisible, setIsOrderActionModalVisible] = useState(false)
   const [orderForAction, setOrderForAction] = useState([])
+  const [isPrintingModalVisible, setIsPrintingModalVisible] = useState(false)
+  const [vendorFullAddress, setVendorFullAddress] = useState('')
+  const billRef = useRef(null);
 
   const fetchVendorItemsList = async () => {
     try {
@@ -147,11 +151,52 @@ export default function Home() {
     }
   }
 
+  const fetchVendorAddress = async () => {
+    try {
+      if (!vendorMobileNumber) {
+        console.warn("Vendor mobile number is missing, cannot fetch address.");
+        return;
+      }
+      const vendorAddressesRef = collection(db, 'users', vendorMobileNumber, 'savedAddresses');
+      const vendorAddressesSnap = await getDocs(vendorAddressesRef);
+      if (!vendorAddressesSnap.empty) {
+        const addressDoc = vendorAddressesSnap.docs[0];
+        if (addressDoc) {
+          const addressData = addressDoc.data();
+          setVendorFullAddress(prevFullData => {
+            const updatedFullData = {
+              ...prevFullData,
+              createdAt: addressData.createdAt,
+              updatedAt: addressData.updatedAt,
+              vendorBusinessCity: addressData.vendorBusinessCity,
+              vendorBusinessComplexNameOrBuildingName: addressData.vendorBusinessComplexNameOrBuildingName,
+              vendorBusinessLandmark: addressData.vendorBusinessLandmark,
+              vendorBusinessPincode: addressData.vendorBusinessPincode,
+              vendorBusinessPlotNumberOrShopNumber: addressData.vendorBusinessPlotNumberOrShopNumber,
+              vendorBusinessRoadNameOrStreetName: addressData.vendorBusinessRoadNameOrStreetName,
+              vendorBusinessState: addressData.vendorBusinessState,
+              vendorBusinessVillageNameOrTownName: addressData.vendorBusinessVillageNameOrTownName,
+              vendorLocation: addressData.vendorLocation,
+            };
+            return updatedFullData;
+          });
+        } else {
+          console.warn("No address document found for the vendor.");
+        }
+      } else {
+        console.warn("No addresses found for the vendor.");
+      }
+    } catch (error) {
+      console.error("Error fetching vendor address:", error);
+    }
+  }
+
   useEffect(() => {
     fetchVendorItemsList()
     fetchVendorCategories()
     if (vendorMobileNumber) {
       fetchVendorOrders();
+      fetchVendorAddress()
     }
   }, [vendorMobileNumber])
 
@@ -602,6 +647,51 @@ export default function Home() {
     }
 
     return dates;
+  };
+
+  const shareBill = async () => {
+    if (!billRef.current) return;
+
+    try {
+      const dataUrl = await toPng(billRef.current, {
+        quality: 1,
+        pixelRatio: 2, // High quality
+        backgroundColor: '#ffffff',
+        style: {
+          transform: 'scale(1)',
+        },
+      });
+
+      // Convert data URL to Blob
+      const response = await fetch(dataUrl);
+      const blob = await response.blob();
+
+      const file = new File([blob], 'bill.png', { type: 'image/png' });
+
+      // Use Web Share API
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'My Bill',
+          text: 'Here is your bill from ' + vendorFullData?.businessName,
+        });
+      } else {
+        // Fallback: download image
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = 'bill.png';
+        link.click();
+      }
+    } catch (err) {
+      console.error('Share failed:', err);
+      alert('Share failed. Image downloaded instead.');
+
+      // Fallback download
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = 'bill.png';
+      link.click();
+    }
   };
 
   return (
@@ -3133,19 +3223,35 @@ export default function Home() {
         <Modal animationType={'slide'} transparent={true} visible={isTotalItemsListModalVisible}>
           <View className='p-[10px] h-full w-full bg-[#00000060] items-center justify-center'>
             <View className='h-full w-full rounded-[5px] bg-white p-[10px] max-w-[600px]'>
-              <Text className='text-[24px] text-primary font-bold text-center'>Selected Items Summary</Text>
+              <TouchableOpacity onPress={() => setIsPrintingModalVisible(true)} className='absolute top-[10px] left-[10px] z-50'>
+                <Image source={require('@/assets/images/printImage.png')} style={{ height: 30, width: 30 }} />
+              </TouchableOpacity>
+
+              <Text className='text-[18px] text-primary font-bold text-center'>Selected Items Summary</Text>
+
               <TouchableOpacity onPress={() => setIsTotalItemsListModalVisible(false)} className='absolute top-[10px] right-[10px] z-50'>
                 <Image source={require('@/assets/images/crossImage.png')} style={{ height: 30, width: 30 }} />
               </TouchableOpacity>
 
               {/* Header for items list */}
-              <View className="flex-row justify-between items-center p-2 bg-gray-100 border-b border-gray-300">
-                <Text className="font-bold flex-1">Item Details</Text>
-                <Text className="font-bold ml-4 w-[60px] text-center">
-                  Total Qty ({Object.values(ordersToSummarize).reduce((total, order) =>
-                    total + (order?.items?.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0) || 0), 0)
-                  })
-                </Text>
+              <View className="flex-row justify-between items-center p-[10px] bg-gray-100 border-b border-gray-300 mt-[10px]">
+                <View className='flex-1' >
+                  <Text className="font-bold flex-1">Total Orders:</Text>
+                  <Text className="font-bold flex-1">Total Qty:</Text>
+                  <Text className="font-bold flex-1">Sub Total:</Text>
+                  <Text className="font-bold flex-1">Delivery Charges:</Text>
+                  <Text className="font-bold flex-1">Offers:</Text>
+                  <Text className="font-bold flex-1">Grand Total:</Text>
+                </View>
+
+                <View className='items-end' >
+                  <Text className="font-bold flex-1">{Object?.values(ordersToSummarize)?.length}</Text>
+                  <Text className="font-bold flex-1">{Object.values(ordersToSummarize).reduce((total, order) => total + (order?.items?.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0) || 0), 0)}</Text>
+                  <Text className="font-bold flex-1">₹{Object.values(ordersToSummarize).reduce((total, order) => total + Number(order?.items?.reduce((innerTotal, item) => innerTotal + Number(Number(item?.quantity || 0) * Number(item?.price?.[0]?.sellingPrice || 0)), 0) || 0), 0)?.toFixed(2)}</Text>
+                  <Text className="font-bold flex-1">₹{Object.values(ordersToSummarize).reduce((total, order) => total + Number(order?.deliveryCharge || 0), 0)?.toFixed(2)}</Text>
+                  <Text className="font-bold flex-1">₹{Object.values(ordersToSummarize).reduce((total, order) => total + Number(order?.totalDiscount || 0), 0)?.toFixed(2)}</Text>
+                  <Text className="font-bold flex-1">₹{Object.values(ordersToSummarize).reduce((total, order) => total + Number(order?.totalAmount || 0), 0)?.toFixed(2)}</Text>
+                </View>
               </View>
 
               <FlatList
@@ -3404,6 +3510,114 @@ export default function Home() {
           </View>
         </Modal>
       )}
-    </View>
+
+      {isPrintingModalVisible && (
+        <Modal animationType={'slide'} transparent={true} visible={isPrintingModalVisible}>
+          <View className='p-[10px] h-full w-full bg-[#00000060] items-center justify-center'>
+            <View className='h-full w-full rounded-[5px] bg-white p-[10px] max-w-[600px]'>
+              <Text className='text-[18px] text-primary font-bold text-center'>Print & Share</Text>
+              <TouchableOpacity onPress={() => setIsPrintingModalVisible(false)} className='absolute top-[10px] right-[10px] z-50'>
+                <Image source={require('@/assets/images/crossImage.png')} style={{ height: 30, width: 30 }} />
+              </TouchableOpacity>
+
+              <ScrollView contentContainerStyle={{ height: '100%' }} >
+                <View ref={billRef} className='w-full rounded-[5px] border-2 border-[#000] p-[10px] bg-white mt-[10px]'>
+                  <Text className='text-center font-bold'>{vendorFullData?.businessName}</Text>
+                  <Text className='text-center text-[12px]' >{vendorFullAddress?.vendorBusinessPlotNumberOrShopNumber}, {vendorFullAddress?.vendorBusinessComplexNameOrBuildingName}, {vendorFullAddress?.vendorBusinessLandmark}, {vendorFullAddress?.vendorBusinessRoadNameOrStreetName}, {vendorFullAddress?.vendorBusinessVillageNameOrTownName}, {vendorFullAddress?.vendorBusinessCity}, {vendorFullAddress?.vendorBusinessState} - {vendorFullAddress?.vendorBusinessPincode}</Text>
+                  <Text className='text-center text-[12px]'>Ph. {vendorMobileNumber}</Text>
+
+                  <View className='w-full border-b my-[5px]' />
+
+                  <View className='mb-[2px] flex-row gap-[5px] w-full border-b border-[#ccc]'>
+                    <Text className='text-[13px] font-bold'>No.</Text>
+                    <Text className='flex-1 text-[13px] font-bold' numberOfLines={1}>Name</Text>
+                    <Text className='text-[13px] text-right w-12 font-bold'>QTY</Text>
+                    <Text className='text-[13px] text-right w-16 font-bold'>Price</Text>
+                    <Text className='text-[13px] text-right w-20 font-bold'>Total</Text>
+                  </View>
+
+                  {/* Items List */}
+                  {(() => {
+                    // Aggregate items by name, variantName, and sellingPrice
+                    const aggregatedItems = {};
+                    let itemIndex = 0;
+
+                    Object.values(ordersToSummarize).forEach(order => {
+                      order.items?.forEach(item => {
+                        const key = `${item.name}-${item.variantName || ''}-${item?.price?.[0]?.sellingPrice || 0}`;
+
+                        if (aggregatedItems[key]) {
+                          // If item already exists, increment quantity and recalculate total
+                          aggregatedItems[key].quantity += Number(item.quantity) || 0;
+                          aggregatedItems[key].total = aggregatedItems[key].quantity * Number(item?.price?.[0]?.sellingPrice || 0);
+                        } else {
+                          // If item doesn't exist, add it with index
+                          aggregatedItems[key] = {
+                            ...item,
+                            quantity: Number(item.quantity) || 0,
+                            total: Number(item.quantity) * Number(item?.price?.[0]?.sellingPrice || 0),
+                            index: ++itemIndex
+                          };
+                        }
+                      });
+                    });
+
+                    // Convert to array and render
+                    return Object.values(aggregatedItems).map((item) => (
+                      <View key={`${item.name}-${item.variantName || ''}-${item.index}`} className='mb-[2px] flex-row gap-[5px] w-full'>
+                        <Text className='text-[13px]'>{item.index}.</Text>
+                        <Text className='flex-1 text-[13px]'>
+                          {item.name}{' '}
+                          <Text className='text-[10px]'>
+                            {item?.variantName && item?.variantName !== '' ? `(${item?.variantName})` : ''}
+                          </Text>
+                        </Text>
+                        <Text className='text-[13px] text-right w-12'>{item.quantity}</Text>
+                        <Text className='text-[13px] text-right w-16'>₹{item?.price?.[0]?.sellingPrice || 0}</Text>
+                        <Text className='text-[13px] text-right w-20'>₹{item.total}</Text>
+                      </View>
+                    ));
+                  })()}
+
+                  <View className='w-full border-b my-[5px]' />
+
+                  <View className="flex-row justify-between items-center p-[10px] bg-gray-100 border-b border-gray-300 rounded-[5px]">
+                    <View className='flex-1' >
+                      <Text className="font-bold flex-1">Total Orders:</Text>
+                      <Text className="font-bold flex-1">Total Qty:</Text>
+                      <View className='w-full border-b my-[5px]' />
+                      <Text className="flex-1">Sub Total:</Text>
+                      <Text className="flex-1">Delivery Charges:</Text>
+                      <Text className="flex-1">Offers:</Text>
+                      <View className='w-full border-b my-[5px]' />
+                      <Text className="font-bold flex-1 text-[18px]">Grand Total:</Text>
+                    </View>
+
+                    <View className='items-end' >
+                      <Text className="font-bold flex-1">{Object?.values(ordersToSummarize)?.length}</Text>
+                      <Text className="font-bold flex-1">{Object.values(ordersToSummarize).reduce((total, order) => total + (order?.items?.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0) || 0), 0)}</Text>
+                      <View className='w-full border-b my-[5px]' />
+                      <Text className="flex-1">₹{Object.values(ordersToSummarize).reduce((total, order) => total + Number(order?.items?.reduce((innerTotal, item) => innerTotal + Number(Number(item?.quantity || 0) * Number(item?.price?.[0]?.sellingPrice || 0)), 0) || 0), 0)?.toFixed(2)}</Text>
+                      <Text className="flex-1">₹{Object.values(ordersToSummarize).reduce((total, order) => total + Number(order?.deliveryCharge || 0), 0)?.toFixed(2)}</Text>
+                      <Text className="flex-1">₹{Object.values(ordersToSummarize).reduce((total, order) => total + Number(order?.totalDiscount || 0), 0)?.toFixed(2)}</Text>
+                      <View className='w-full border-b my-[5px]' />
+                      <Text className="font-bold flex-1 text-[18px]">₹{Object.values(ordersToSummarize).reduce((total, order) => total + Number(order?.totalAmount || 0), 0)?.toFixed(2)}</Text>
+                    </View>
+                  </View>
+
+                  <View className='w-full border-b my-[5px]' />
+
+                  <Text className='text-center font-bold'>Thanks for ordering!</Text>
+                </View>
+              </ScrollView>
+
+              <TouchableOpacity onPress={shareBill} className='p-[10px] bg-primary rounded-[5px] w-full self-center mt-[5px]' >
+                <Text className='font-bold text-white text-center text-[18px]' >Share</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+    </View >
   );
 }
