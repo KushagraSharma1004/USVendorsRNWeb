@@ -66,6 +66,8 @@ export default function Home() {
   const [selectedStatusFilters, setSelectedStatusFilters] = useState(['Pending'])
   const [isSelectedOrderItemsListModalVisible, setIsSelectedOrderItemsListModalVisible] = useState(false)
   const [orderToShowItemsFor, setOrderToShowItemsFor] = useState([])
+  const [isOrderActionModalVisible, setIsOrderActionModalVisible] = useState(false)
+  const [orderForAction, setOrderForAction] = useState([])
 
   const fetchVendorItemsList = async () => {
     try {
@@ -836,7 +838,9 @@ export default function Home() {
 
                 {/* Header Row */}
                 <View className='flex-row bg-[#f0f0f0] sticky top-[0px] z-50 gap-[4px]'>
+                  {/* SR. No */}
                   <Text className='text-center w-[40px] text-[12px] bg-black text-white py-[5px]' >SR no.</Text>
+                  {/* Order Id */}
                   <Text className='text-center w-[165px] text-[12px] bg-black text-white py-[5px]' >Order Id</Text>
                   {/* Order Status */}
                   <View className='flex-row bg-black w-[130px] py-[5px] items-center justify-between px-[5px]'>
@@ -1293,7 +1297,7 @@ export default function Home() {
                         }
 
                         return statusMatch && deliveryMatch && timeMatch;
-                      }).reduce((total, order) => total + Number(order?.deliveryCharge), 0)?.toFixed(2)
+                      }).reduce((total, order) => total + Number(order?.deliveryCharge || 0), 0)?.toFixed(2)
                   }</Text>
                   {/* Offer */}
                   <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Offer: ₹{
@@ -1417,6 +1421,12 @@ export default function Home() {
                       </TouchableOpacity>
                     )}
                   </View>
+                  {/* Customer Name */}
+                  <Text className='text-center w-[130px] text-[12px] bg-black text-white py-[5px]' >Customer Name</Text>
+                  {/* Customer Mobile Number */}
+                  <Text className='text-center w-[130px] text-[12px] bg-black text-white py-[5px]' >Customer Mob.</Text>
+                  {/* Customer Address */}
+                  <Text className='text-center w-[600px] text-[12px] bg-black text-white py-[5px]' >Customer Address</Text>
                 </View>
 
                 {/* Delivery Mode Filter Dropdown */}
@@ -2180,6 +2190,7 @@ export default function Home() {
                       return statusMatch && deliveryMatch && timeMatch
                     }).map((order, index) => (
                       <View key={order.id} className={`flex-row gap-[4px] py-1 border-b border-gray-200 ${ordersToSummarize[order.id] ? 'bg-blue-100' : ''}`}>
+                        {/* SR. No */}
                         <TouchableOpacity className={`${Object.values(ordersToSummarize)?.filter((innerOrder) => innerOrder?.id === order?.id)?.length > 0 ? 'bg-primary' : ''}`} onPress={() => setOrdersToSummarize(prev => prev[order.id] ? (() => { const { [order.id]: removed, ...rest } = prev; return rest; })() : { ...prev, [order.id]: order })}>
                           <Text className={`text-center w-[40px] text-[12px] py-[5px] ${Object.values(ordersToSummarize)?.filter((innerOrder) => innerOrder?.id === order?.id)?.length > 0 ? 'text-white' : ''}`}>
                             {(() => {
@@ -2290,17 +2301,38 @@ export default function Home() {
                             })()}
                           </Text>
                         </TouchableOpacity>
+                        {/* Order Id */}
                         <Text className='text-center w-[165px] text-[12px] py-[5px]'>{order?.id}</Text>
-                        <Text className={`text-center w-[130px] text-[12px] py-[5px] ${order?.orderStatus === 'Pending' ? 'bg-primaryYellow' : order?.orderStatus === 'Approved' ? 'bg-primaryGreen text-white' : 'bg-primaryRed text-white'}`}>{order?.orderStatus || 'Pending'}</Text>
+                        {/* Order Status */}
+                        {order?.orderStatus === 'Pending' ? (
+                          <TouchableOpacity onPress={() => { setIsOrderActionModalVisible(true); setOrderForAction(order) }} >
+                            <Text className={`text-center w-[130px] text-[12px] py-[5px] ${order?.orderStatus === 'Pending' ? orderForAction?.id === order?.id ? 'bg-[#ccc]' : 'bg-primaryYellow' : order?.orderStatus === 'Approved' ? 'bg-primaryGreen text-white' : 'bg-primaryRed text-white'}`}>{order?.orderStatus || 'Pending'}</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <Text className={`text-center w-[130px] text-[12px] py-[5px] ${order?.orderStatus === 'Pending' ? 'bg-primaryYellow' : order?.orderStatus === 'Approved' ? 'bg-primaryGreen text-white' : 'bg-primaryRed text-white'}`}>{order?.orderStatus || 'Pending'}</Text>
+                        )}
+                        {/* Order Items */}
                         <TouchableOpacity onPress={() => { setOrderToShowItemsFor(order); setIsSelectedOrderItemsListModalVisible(true) }}>
                           <Text className='text-center w-[80px] text-[12px] py-[5px]'>{order?.items?.reduce((total, item) => { const quantity = Number(item?.quantity) || 0; return total + quantity; }, 0) || '0'}</Text>
                         </TouchableOpacity>
+                        {/* Delivery Mode */}
                         <Text className={`text-center w-[150px] text-[12px] py-[5px] ${order?.deliveryMode === 'Takeaway/Pickup' ? 'text-primaryRed' : order?.deliveryMode === 'Home Delivery' ? 'text-primaryGreen' : ''}`}>{order?.deliveryMode || `QR: (${order?.QRCodeMessage})`}</Text>
+                        {/* Total Amount */}
                         <Text className='text-center w-[80px] text-[12px] py-[5px]'>₹{Number(order?.totalAmount).toFixed(2) || '0'}</Text>
+                        {/* Sub Total */}
                         <Text className='text-center w-[80px] text-[12px] py-[5px]'>₹{order?.items?.reduce((total, item) => { const sellingPrice = Number(item?.price?.[0]?.sellingPrice) || 0; const quantity = Number(item?.quantity) || 0; return total + (sellingPrice * quantity); }, 0).toFixed(2) || '0'}</Text>
+                        {/* Delivery Charge */}
                         <Text className={`text-center w-[100px] text-[12px] py-[5px] ${(order?.deliveryCharge || '0') !== '0' ? 'text-primaryRed' : ''}`}>₹{order?.deliveryCharge || '0'}</Text>
+                        {/* Offer */}
                         <Text className={`text-center w-[80px] text-[12px] py-[5px] ${(order?.totalDiscount || 0) !== 0 ? 'text-primaryGreen' : ''}`}>₹{order?.totalDiscount || '0'}</Text>
+                        {/* Order Time */}
                         <Text className={`text-center w-[130px] text-[12px] py-[5px]`}>{order?.orderTime?.toDate()?.toLocaleString() || 'No time'}</Text>
+                        {/* Customer Name */}
+                        <Text className={`text-center w-[130px] text-[12px] py-[5px]`}>{order?.customerMobileNumber === '1000000001' ? order?.customerNameForCustomisedQR : order?.customerName || 'No Name'}</Text>
+                        {/* Customer Mobile Number */}
+                        <Text className={`text-center w-[130px] text-[12px] py-[5px]`}>{order?.customerMobileNumber === '1000000001' ? order?.customerMobileNumberForCustomisedQR : order?.customerMobileNumber || 'No Mob. no.'}</Text>
+                        {/* Customer Address */}
+                        <Text className={`text-center w-[600px] text-[12px] py-[5px]`}>{order?.customerMobileNumber === '1000000001' ? 'QR Code' : `${order?.address?.customerPlotNumber}, ${order?.address?.customerComplexNameOrBuildingName}, ${order?.address?.customerLandmark}, ${order?.address?.customerRoadNameOrStreetName}, ${order?.address?.customerVillageNameOrTownName}, ${order?.address?.customerCity}, ${order?.address?.customerState} - ${order?.address?.customerPincode}, ${order?.address?.mobileNumberForAddress}` || 'No Add.'}</Text>
                       </View>
                     ))}
 
@@ -2312,6 +2344,7 @@ export default function Home() {
             </ScrollView>
           </View>
         )}
+
         {activeSection === 'bulkedit' && (
           <View>
             {vendorItemsList.length > 0 && (
@@ -3004,37 +3037,46 @@ export default function Home() {
             )}
           </View>
         )}
+
         {activeSection === 'serviceareafencing' && (
           <Text className='p-[10px] text-center text-[24px]' >Comming Soon...</Text>
         )}
+
         {activeSection === 'deliverymodes' && (
           <Text className='p-[10px] text-center text-[24px]' >Comming Soon...</Text>
         )}
+
         {activeSection === 'deliveryconditions' && (
           <Text className='p-[10px] text-center text-[24px]' >Comming Soon...</Text>
         )}
+
         {activeSection === 'myoffers' && (
           <Text className='p-[10px] text-center text-[24px]' >Comming Soon...</Text>
         )}
+
         {activeSection === 'category' && (
           <Text className='p-[10px] text-center text-[24px]' >Comming Soon...</Text>
         )}
+
         {activeSection === 'arrangeitems' && (
           <Text className='p-[10px] text-center text-[24px]' >Comming Soon...</Text>
         )}
+
         {activeSection === 'myqrs' && (
           <Text className='p-[10px] text-center text-[24px]' >Comming Soon...</Text>
         )}
+
         {activeSection === 'mybanners' && (
           <Text className='p-[10px] text-center text-[24px]' >Comming Soon...</Text>
         )}
+
         {activeSection === 'sharingdetails' && (
           <Text className='p-[10px] text-center text-[24px]' >Comming Soon...</Text>
         )}
       </View>
 
       {showSaveAlert && (
-        <View className="absolute inset-0 bg-black bg-opacity-50 justify-center items-center z-50">
+        <View className="absolute inset-0 bg-black bg-opacity-50 justify-center items-center z-50 max-w-[600px]">
           <View className="bg-white p-4 rounded-lg mx-4">
             <Text className="text-lg font-bold mb-2">Save Changes?</Text>
             <Text className="mb-4">You have unsaved changes. Do you want to save before editing another field?</Text>
@@ -3090,7 +3132,7 @@ export default function Home() {
       {isTotalItemsListModalVisible && (
         <Modal animationType={'slide'} transparent={true} visible={isTotalItemsListModalVisible}>
           <View className='p-[10px] h-full w-full bg-[#00000060] items-center justify-center'>
-            <View className='h-full w-full rounded-[5px] bg-white p-[10px]'>
+            <View className='h-full w-full rounded-[5px] bg-white p-[10px] max-w-[600px]'>
               <Text className='text-[24px] text-primary font-bold text-center'>Selected Items Summary</Text>
               <TouchableOpacity onPress={() => setIsTotalItemsListModalVisible(false)} className='absolute top-[10px] right-[10px] z-50'>
                 <Image source={require('@/assets/images/crossImage.png')} style={{ height: 30, width: 30 }} />
@@ -3160,11 +3202,10 @@ export default function Home() {
         </Modal>
       )}
 
-      {/* Custom Range Modal */}
       {isCustomRangeModalVisible && (
         <Modal animationType="slide" transparent={true} visible={isCustomRangeModalVisible}>
           <View className='p-[10px] h-full w-full bg-[#00000060] items-center justify-center'>
-            <View className='h-[580px] w-full max-w-md rounded-[5px] bg-white p-[10px]'>
+            <View className='h-[580px] w-full max-w-md rounded-[5px] bg-white p-[10px] max-w-[600px]'>
 
               <Text className='text-[20px] text-primary font-bold text-center mb-4'>
                 Select Custom Date Range
@@ -3304,7 +3345,7 @@ export default function Home() {
       {isSelectedOrderItemsListModalVisible && (
         <Modal animationType={'slide'} transparent={true} visible={isSelectedOrderItemsListModalVisible}>
           <View className='p-[10px] h-full w-full bg-[#00000060] items-center justify-center'>
-            <View className='h-full w-full rounded-[5px] bg-white p-[10px]'>
+            <View className='h-full w-full rounded-[5px] bg-white p-[10px] max-w-[600px]'>
               <Text className='text-[18px] text-primary font-bold text-center'>Selected Order Items Summary</Text>
               <TouchableOpacity onPress={() => setIsSelectedOrderItemsListModalVisible(false)} className='absolute top-[10px] right-[10px] z-50'>
                 <Image source={require('@/assets/images/crossImage.png')} style={{ height: 30, width: 30 }} />
@@ -3346,6 +3387,19 @@ export default function Home() {
                   <Text className="text-center text-gray-500 p-4">No items in selected orders</Text>
                 }
               />
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {isOrderActionModalVisible && (
+        <Modal animationType={'slide'} transparent={true} visible={isOrderActionModalVisible}>
+          <View className='p-[10px] h-full w-full bg-[#00000060] items-center justify-center'>
+            <View className='h-full w-full rounded-[5px] bg-white p-[10px] max-w-[600px]'>
+              <Text className='text-[24px] text-primary font-bold text-center'>Action For Order</Text>
+              <TouchableOpacity onPress={() => { setIsOrderActionModalVisible(false); setOrderForAction([]) }} className='absolute top-[10px] right-[10px] z-50'>
+                <Image source={require('@/assets/images/crossImage.png')} style={{ height: 30, width: 30 }} />
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
