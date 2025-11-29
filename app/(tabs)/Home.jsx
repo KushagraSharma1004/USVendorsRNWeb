@@ -390,14 +390,14 @@ export default function Home() {
       return;
     }
 
-    const itemExists = vendorItemsList.some(
-      (item) => item.name?.toLowerCase().trimEnd() === newItemName.toLowerCase().trimEnd()
-    );
-    if (itemExists) {
-      alert('Duplicate Item', 'An item with this name already exists in this category.');
-      setIsBulkEditingLoaderVisible(false);
-      return;
-    }
+    // const itemExists = vendorItemsList.some(
+    //   (item) => item.name?.toLowerCase().trimEnd() === newItemName.toLowerCase().trimEnd()
+    // );
+    // if (itemExists) {
+    //   alert('Duplicate Item', 'An item with this name already exists in this category.');
+    //   setIsBulkEditingLoaderVisible(false);
+    //   return;
+    // }
 
     const newVariantId = generateVariantId(newVariantName.trimEnd());
 
@@ -2939,7 +2939,7 @@ export default function Home() {
                                                   <View className='bg-[#e6f3ff]' >
                                                     {groupedItem.variants.map((variant) => (
                                                       <View className="flex-row gap-[4px]" key={variant?.id}>
-                                                        <TouchableOpacity className='w-[60px] bg-primaryRed border border-[#ffffff] items-center justify-center' onPress={() => handleDeleteVariant(item, variant)}><Text className='text-center text-white' >Delete</Text></TouchableOpacity>
+                                                        <TouchableOpacity className='w-[60px] bg-primaryRed border border-[#ffffff] items-center justify-center' onPress={() => handleDeleteVariant(groupedItem, variant)}><Text className='text-center text-white' >Delete</Text></TouchableOpacity>
                                                         <EditableField
                                                           itemId={groupedItem.id}
                                                           variantId={variant.id}
