@@ -68,7 +68,7 @@ export default function Home() {
   const [isSelectedOrderItemsListModalVisible, setIsSelectedOrderItemsListModalVisible] = useState(false)
   const [orderToShowItemsFor, setOrderToShowItemsFor] = useState([])
   const [orderForAction, setOrderForAction] = useState([])
-  const [isPrintingModalVisible, setIsPrintingModalVisible] = useState(false)
+  const [isPrintingModalForSelectedOrdersVisible, setIsPrintingModalForSelectedOrdersVisible] = useState(false)
   const [vendorFullAddress, setVendorFullAddress] = useState('')
   const billRef = useRef(null);
   const [isEditOrderModalVisible, setIsEditOrderModalVisible] = useState(false)
@@ -76,6 +76,8 @@ export default function Home() {
   const [isSalesLoaderVisible, setIsSalesLoaderVisible] = useState(false)
   const [newSellingPricesForEditingOrder, setNewSellingPricesForEditingOrder] = useState({})
   const [newQtysForEditingOrder, setNewQtysForEditingOrder] = useState({})
+  const [isPrintingModalVisible, setIsPrintingModalVisible] = useState(false)
+  const [orderForPrinting, setOrderForPrinting] = useState([])
 
   const fetchVendorItemsList = async () => {
     try {
@@ -1395,6 +1397,8 @@ export default function Home() {
                       </TouchableOpacity>
                     )}
                   </View>
+                  {/* Print */}
+                  <Text className='text-center w-[40px] text-[12px] bg-black text-white py-[5px]' >Print</Text>
                   {/* Total */}
                   <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Total: ₹{
                     vendorOrders
@@ -2298,7 +2302,7 @@ export default function Home() {
 
                 {/* Time Filter Dropdown */}
                 {isTimeSortSelected && (
-                  <View className="bg-white border border-gray-300 max-h-[350px] max-w-fit absolute top-[40px] left-[940px] z-50 shadow-md">
+                  <View className="bg-white border border-gray-300 max-h-[350px] max-w-fit absolute top-[40px] left-[984px] z-50 shadow-md">
                     <ScrollView nestedScrollEnabled={true}>
                       <TouchableOpacity
                         onPress={() => {
@@ -2717,8 +2721,8 @@ export default function Home() {
                         {/* Order Status */}
                         {order?.orderStatus === 'Pending' ? (
                           <View className='flex-row w-[130px]' >
-                            <TouchableOpacity onPress={() => {setOrderForAction(order); handleApproveOrder(order)}} className='flex-1 rounded-l-[5px] bg-primaryGreen items-center justify-center' ><Text className='text-center text-white text-[10px]' >Approve</Text></TouchableOpacity>
-                            <TouchableOpacity onPress={() => {setOrderForAction(order); handleRejectOrder(order)}} className='flex-1 bg-primaryRed items-center justify-center' ><Text className='text-center text-white text-[10px]' >Reject</Text></TouchableOpacity>
+                            <TouchableOpacity onPress={() => { setOrderForAction(order); handleApproveOrder(order) }} className='flex-1 rounded-l-[5px] bg-primaryGreen items-center justify-center' ><Text className='text-center text-white text-[10px]' >Approve</Text></TouchableOpacity>
+                            <TouchableOpacity onPress={() => { setOrderForAction(order); handleRejectOrder(order) }} className='flex-1 bg-primaryRed items-center justify-center' ><Text className='text-center text-white text-[10px]' >Reject</Text></TouchableOpacity>
                             <TouchableOpacity onPress={() => {
                               setOrderForAction(order)
                               setIsEditOrderModalVisible(true);
@@ -2742,6 +2746,10 @@ export default function Home() {
                         </TouchableOpacity>
                         {/* Delivery Mode */}
                         <Text className={`text-center w-[150px] text-[12px] py-[5px] ${order?.deliveryMode === 'Takeaway/Pickup' ? 'text-primaryRed' : order?.deliveryMode === 'Home Delivery' ? 'text-primaryGreen' : ''}`}>{order?.deliveryMode || `QR: (${order?.QRCodeMessage})`}</Text>
+                        {/* Print */}
+                        <TouchableOpacity onPress={() => { setOrderForPrinting(order); setIsPrintingModalVisible(true) }} className='w-[40px] items-center justify-center'>
+                          <Image style={{ height: 22, width: 22 }} source={require('@/assets/images/printImage.png')} />
+                        </TouchableOpacity>
                         {/* Total Amount */}
                         <Text className='text-center w-[80px] text-[12px] py-[5px]'>₹{Number(order?.totalAmount).toFixed(2) || '0'}</Text>
                         {/* Sub Total */}
@@ -3558,7 +3566,7 @@ export default function Home() {
         <Modal animationType={'slide'} transparent={true} visible={isTotalItemsListModalVisible}>
           <View className='p-[10px] h-full w-full bg-[#00000060] items-center justify-center'>
             <View className='h-full w-full rounded-[5px] bg-white p-[10px] max-w-[600px]'>
-              <TouchableOpacity onPress={() => setIsPrintingModalVisible(true)} className='absolute top-[10px] left-[10px] z-50'>
+              <TouchableOpacity onPress={() => setIsPrintingModalForSelectedOrdersVisible(true)} className='absolute top-[10px] left-[10px] z-50'>
                 <Image source={require('@/assets/images/printImage.png')} style={{ height: 30, width: 30 }} />
               </TouchableOpacity>
 
@@ -3968,17 +3976,17 @@ export default function Home() {
         </Modal>
       )}
 
-      {isPrintingModalVisible && (
-        <Modal animationType={'slide'} transparent={true} visible={isPrintingModalVisible}>
+      {isPrintingModalForSelectedOrdersVisible && (
+        <Modal animationType={'slide'} transparent={true} visible={isPrintingModalForSelectedOrdersVisible}>
           <View className='p-[10px] h-full w-full bg-[#00000060] items-center justify-center'>
             <View className='h-full w-full rounded-[5px] bg-white p-[10px] max-w-[600px]'>
               <Text className='text-[18px] text-primary font-bold text-center'>Print & Share</Text>
-              <TouchableOpacity onPress={() => setIsPrintingModalVisible(false)} className='absolute top-[10px] right-[10px] z-50'>
+              <TouchableOpacity onPress={() => setIsPrintingModalForSelectedOrdersVisible(false)} className='absolute top-[10px] right-[10px] z-50'>
                 <Image source={require('@/assets/images/crossImage.png')} style={{ height: 30, width: 30 }} />
               </TouchableOpacity>
 
-              <ScrollView contentContainerStyle={{ height: '100%' }} >
-                <View ref={billRef} className='w-full rounded-[5px] border-2 border-[#000] p-[10px] bg-white mt-[10px]'>
+              <ScrollView contentContainerStyle={{ height: '100%', marginTop: 10 }} >
+                <View ref={billRef} className='w-full rounded-[5px] border-2 border-[#000] p-[10px] bg-white'>
                   <Text className='text-center font-bold'>{vendorFullData?.businessName}</Text>
                   <Text className='text-center text-[12px]' >{vendorFullAddress?.vendorBusinessPlotNumberOrShopNumber}, {vendorFullAddress?.vendorBusinessComplexNameOrBuildingName}, {vendorFullAddress?.vendorBusinessLandmark}, {vendorFullAddress?.vendorBusinessRoadNameOrStreetName}, {vendorFullAddress?.vendorBusinessVillageNameOrTownName}, {vendorFullAddress?.vendorBusinessCity}, {vendorFullAddress?.vendorBusinessState} - {vendorFullAddress?.vendorBusinessPincode}</Text>
                   <Text className='text-center text-[12px]'>Ph. {vendorMobileNumber}</Text>
@@ -4061,6 +4069,120 @@ export default function Home() {
                       <Text className="font-bold flex-1 text-[18px]">₹{Object.values(ordersToSummarize).reduce((total, order) => total + Number(order?.totalAmount || 0), 0)?.toFixed(2)}</Text>
                     </View>
                   </View>
+
+                  <View className='w-full border-b my-[5px]' />
+
+                  <Text className='text-center font-bold'>Thanks for ordering!</Text>
+                </View>
+              </ScrollView>
+
+              <TouchableOpacity onPress={shareBill} className='p-[10px] bg-primary rounded-[5px] w-full self-center mt-[5px]' >
+                <Text className='font-bold text-white text-center text-[18px]' >Share</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {isPrintingModalVisible && (
+        <Modal animationType={'slide'} transparent={true} visible={isPrintingModalVisible}>
+          <View className='p-[10px] h-full w-full bg-[#00000060] items-center justify-center'>
+            <View className='h-full w-full rounded-[5px] bg-white p-[10px] max-w-[600px]'>
+              <Text className='text-[18px] text-primary font-bold text-center'>Print & Share</Text>
+              <TouchableOpacity onPress={() => setIsPrintingModalVisible(false)} className='absolute top-[10px] right-[10px] z-50'>
+                <Image source={require('@/assets/images/crossImage.png')} style={{ height: 30, width: 30 }} />
+              </TouchableOpacity>
+
+              <ScrollView contentContainerStyle={{ height: '100%', marginTop: 10 }} >
+                <View ref={billRef} className='w-full rounded-[5px] border-2 border-[#000] p-[10px] bg-white'>
+                  <Text className='text-center font-bold'>{vendorFullData?.businessName}</Text>
+                  <Text className='text-center text-[12px]' >{vendorFullAddress?.vendorBusinessPlotNumberOrShopNumber}, {vendorFullAddress?.vendorBusinessComplexNameOrBuildingName}, {vendorFullAddress?.vendorBusinessLandmark}, {vendorFullAddress?.vendorBusinessRoadNameOrStreetName}, {vendorFullAddress?.vendorBusinessVillageNameOrTownName}, {vendorFullAddress?.vendorBusinessCity}, {vendorFullAddress?.vendorBusinessState} - {vendorFullAddress?.vendorBusinessPincode}</Text>
+                  <Text className='text-center text-[12px]'>Ph. {vendorMobileNumber}</Text>
+
+                  <View className='w-full border-b my-[5px]' />
+
+                  <Text className='text-center'>Customer: {orderForPrinting?.customerName || orderForPrinting?.customerNameForCustomisedQR || ''}</Text>
+                  {orderForPrinting?.address && <Text className='text-center text-[12px]' >{orderForPrinting?.address?.customerPlotNumber}, {orderForPrinting?.address?.customerComplexNameOrBuildingName}, {orderForPrinting?.customerNameForCustomisedQR?.address?.customerLandmark}, {orderForPrinting?.address?.customerRoadNameOrStreetName}, {orderForPrinting?.address?.customerVillageNameOrTownName}, {orderForPrinting?.address?.customerCity}, {orderForPrinting?.address?.customerState} - {orderForPrinting?.address?.customerPincode}</Text>}
+                  <Text className='text-center text-[12px]'>Ph. {orderForPrinting?.customerMobileNumber !== '1000000001' ? orderForPrinting?.customerMobileNumber : orderForPrinting?.customerMobileNumberForCustomisedQR || orderForPrinting?.customerMobileNumberForCustomisedQR || ''}</Text>
+
+                  <View className='w-full border-b my-[5px]' />
+
+                  <Text className='text-center'>Order Id: {orderForPrinting?.id}</Text>
+                  <Text className='text-center text-[12px]'>{new Date(orderForPrinting.orderTime?.toDate?.() || orderForPrinting.orderTime).toLocaleString()}</Text>
+                  <Text className='font-bold text-center'>{orderForPrinting?.deliveryMode || orderForPrinting?.QRCodeMessage || ''}</Text>
+
+                  <View className='w-full border-b my-[5px]' />
+
+                  <View className='mb-[2px] flex-row gap-[5px] w-full border-b border-[#ccc]'>
+                    <Text className='text-[13px] font-bold'>No.</Text>
+                    <Text className='flex-1 text-[13px] font-bold' numberOfLines={1}>Name</Text>
+                    <Text className='text-[13px] text-right w-12 font-bold'>QTY</Text>
+                    <Text className='text-[13px] text-right w-16 font-bold'>Price</Text>
+                    <Text className='text-[13px] text-right w-20 font-bold'>Total</Text>
+                  </View>
+
+                  {/* Items List */}
+                  {(() => {
+                    // Aggregate items by name, variantName, and sellingPrice
+                    const aggregatedItems = {};
+                    let itemIndex = 0;
+
+                    orderForPrinting.items?.forEach(item => {
+                      const key = `${item.name}-${item.variantName || ''}-${item?.price?.[0]?.sellingPrice || 0}`;
+
+                      if (aggregatedItems[key]) {
+                        // If item already exists, increment quantity and recalculate total
+                        aggregatedItems[key].quantity += Number(item.quantity) || 0;
+                        aggregatedItems[key].total = aggregatedItems[key].quantity * Number(item?.price?.[0]?.sellingPrice || 0);
+                      } else {
+                        // If item doesn't exist, add it with index
+                        aggregatedItems[key] = {
+                          ...item,
+                          quantity: Number(item.quantity) || 0,
+                          total: Number(item.quantity) * Number(item?.price?.[0]?.sellingPrice || 0),
+                          index: ++itemIndex
+                        };
+                      }
+                    });
+
+                    // Convert to array and render
+                    return Object.values(aggregatedItems).sort((a, b) => a?.name?.localeCompare(b?.name)).map((item, index) => (
+                      <View key={`${item.name}-${item.variantName || ''}-${item.index}`} className='mb-[2px] flex-row gap-[5px] w-full'>
+                        <Text className='text-[13px]'>{index + 1}.</Text>
+                        <Text className='flex-1 text-[13px]'>
+                          {item.name}{' '}
+                          <Text className='text-[10px]'>
+                            {item?.variantName && item?.variantName !== '' ? `(${item?.variantName})` : ''}
+                          </Text>
+                        </Text>
+                        <Text className='text-[13px] text-right w-12'>{item.quantity}</Text>
+                        <Text className='text-[13px] text-right w-16'>₹{item?.price?.[0]?.sellingPrice || 0}</Text>
+                        <Text className='text-[13px] text-right w-20'>₹{item.total}</Text>
+                      </View>
+                    ));
+                  })()}
+
+                  <View className='w-full border-b my-[5px]' />
+
+                  <View className='flex-row justify-between w-full' >
+                    <Text className='text-[13px]'>QTY: {orderForPrinting.items.reduce((total, item) => total + Number(item.quantity), 0)}</Text>
+                    <View className='flex-row' >
+                      <View>
+                        <Text>Sub-Total: </Text>
+                        {orderForPrinting.appliedOffers?.[0] && <Text>Offer: </Text>}
+                        {orderForPrinting.deliveryCharge > 0 && <Text>Delivery: </Text>}
+                      </View>
+                      <View>
+                        <Text className='text-[13px]'>₹{Number((orderForPrinting.totalAmount.toFixed(2) ?? 0) - (orderForPrinting.deliveryCharge ?? 0) + (orderForPrinting.appliedOffers?.[0]?.discount ?? 0)).toFixed(2)}</Text>
+                        {orderForPrinting.appliedOffers?.[0] && <Text className='text-right text-[13px]'>-₹{orderForPrinting.appliedOffers[0].discount}</Text>}
+                        {orderForPrinting.deliveryCharge > 0 && <Text className='text-right text-[13px]'>₹{orderForPrinting.deliveryCharge}</Text>}
+                      </View>
+                    </View>
+                  </View>
+
+                  <View className='w-full border-b my-[5px]' />
+
+                  <Text className='text-right font-bold text-[15px]'>Grand Total: ₹{orderForPrinting?.totalAmount.toFixed(2)}</Text>
 
                   <View className='w-full border-b my-[5px]' />
 
