@@ -2184,9 +2184,10 @@ export default function Home() {
 
                       {/* QR Codes (Unique) */}
                       {(() => {
-                        const uniqueQRCodes = [...new Set(vendorOrders.filter((order) => selectedOrderStatus === 'Pending' ? order?.orderStatus === 'Pending' : selectedOrderStatus === 'Approved' ? order?.orderStatus === 'Approved' : selectedOrderStatus === 'Rejected' ? order?.orderStatus === 'Rejected' : true)
-                          .filter(order => order.QRCodeMessage)
-                          .map(order => order.QRCodeMessage)
+                        const uniqueQRCodes = [...new Set(
+                          vendorOrders
+                            .filter(order => order?.QRCodeMessage) // Only orders that have QR
+                            .map(order => order.QRCodeMessage)
                         )]
 
                         return uniqueQRCodes.map((qrMessage, index) => {
