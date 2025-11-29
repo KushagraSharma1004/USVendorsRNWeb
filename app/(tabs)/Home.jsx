@@ -11,8 +11,8 @@ import { toPng } from 'html-to-image';
 export default function Home() {
   const { vendorMobileNumber, vendorFullData } = useAuth()
   const Section = {
-    SALES: 'sales',
-    BULKEDIT: 'bulkedit',
+    SALESANDOVERVIEW: 'salesandoverview',
+    QUICKITEMEDITING: 'quickitemediting',
     SERVICEAREAFENCING: 'serviceareafencing',
     DELIVERYMODES: 'deliverymodes',
     DELIVERYCONDITIONS: 'deliveryconditions',
@@ -24,7 +24,7 @@ export default function Home() {
     SHARINGDETAILS: 'sharingdetails',
     NONE: null,
   };
-  const [activeSection, setActiveSection] = useState(Section.SALES);
+  const [activeSection, setActiveSection] = useState(Section.SALESANDOVERVIEW);
   const toggleSection = (sectionName) => {
     setActiveSection(activeSection === sectionName ? Section.NONE : sectionName);
   };
@@ -1065,17 +1065,17 @@ export default function Home() {
       <ScrollView showsHorizontalScrollIndicator={false} contentContainerClassName="gap-[2px]" className="w-full max-h-[70px]" horizontal>
         {/* Sales */}
         <TouchableOpacity
-          onPress={() => toggleSection(Section.SALES)}
-          className={`h-full w-[120px] border-[5px] rounded-[5px] ${isSectionActive(Section.SALES) ? 'bg-wheat' : 'bg-white'} border-primary p-[10px] items-center justify-center`} >
-          <Text className="font-bold text-primary text-[16px] text-center" >Sales</Text>
+          onPress={() => toggleSection(Section.SALESANDOVERVIEW)}
+          className={`h-full w-[120px] border-[5px] rounded-[5px] ${isSectionActive(Section.SALESANDOVERVIEW) ? 'bg-wheat' : 'bg-white'} border-primary p-[10px] items-center justify-center`} >
+          <Text className="font-bold text-primary text-[16px] text-center" >Sales & Overview</Text>
           {/* <Text className="font-bold text-primary text-[16px] text-center" >({allVendorsList?.length || 0})</Text> */}
         </TouchableOpacity>
 
         {/* Bulk Editing */}
         <TouchableOpacity
-          onPress={() => toggleSection(Section.BULKEDIT)}
-          className={`h-full w-[120px] border-[5px] rounded-[5px] ${isSectionActive(Section.BULKEDIT) ? 'bg-wheat' : 'bg-white'} border-primary p-[10px] items-center justify-center`} >
-          <Text className="font-bold text-primary text-[16px] text-center" >Bulk Editing</Text>
+          onPress={() => toggleSection(Section.QUICKITEMEDITING)}
+          className={`h-full w-[120px] border-[5px] rounded-[5px] ${isSectionActive(Section.QUICKITEMEDITING) ? 'bg-wheat' : 'bg-white'} border-primary p-[10px] items-center justify-center`} >
+          <Text className="font-bold text-primary text-[16px] text-center" >Quick Item Editing</Text>
           {/* <Text className="font-bold text-primary text-[16px] text-center" >({allVendorsList?.length || 0})</Text> */}
         </TouchableOpacity>
 
@@ -1170,7 +1170,7 @@ export default function Home() {
       </ScrollView>
 
       <View className='flex-1'>
-        {activeSection === 'sales' && (
+        {activeSection === 'salesandoverview' && (
           <View className='flex-1' >
             {isSalesLoaderVisible && (<Loader />)}
             {Object.keys(ordersToSummarize).length > 0 && (
@@ -2778,7 +2778,7 @@ export default function Home() {
           </View>
         )}
 
-        {activeSection === 'bulkedit' && (
+        {activeSection === 'quickitemediting' && (
           <View>
             {vendorItemsList.length > 0 && (
               (() => {

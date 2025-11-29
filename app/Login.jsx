@@ -6,6 +6,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import Loader from './components/Loader.jsx'
 import { doc, getDoc} from 'firebase/firestore'
 import { db } from '@/firebase'
+import { decryptData } from './context/hashing.js'
 
 const Login = () => {
   const router = useRouter()
@@ -24,6 +25,12 @@ const Login = () => {
     }
     if (vendorPasswordFromURL && vendorPasswordFromURL.length > 0) {
       setVendorPasswordThisScreen(vendorPasswordFromURL)
+    }
+    if(vendorMobileNumberFromURL && vendorMobileNumberFromURL.length > 10){
+      setVendorMobileNumberThisScreen(decryptData(vendorMobileNumberFromURL || ''))
+    }
+    if (vendorPasswordFromURL && vendorPasswordFromURL.length > 10) {
+      setVendorPasswordThisScreen(decryptData(vendorPasswordFromURL || ''))
     }
   }, [vendorMobileNumberFromURL, vendorPasswordFromURL]);
 
