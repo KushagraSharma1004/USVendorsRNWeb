@@ -509,6 +509,9 @@ export default function Home() {
                   updatedVariant.prices[0].variantPrice = String(newValue);
                 }
                 break;
+              case 'buyingLimit':
+                updatedVariant.buyingLimit = Number(newValue);
+                break;
               default:
                 console.warn('Unknown field:', fieldName);
             }
@@ -2838,7 +2841,7 @@ export default function Home() {
                 });
                 const ItemNameCell = ({ item }) => (
                   <View
-                    className="border border-[#ccc] h-full w-[150px] mr-1 justify-center items-center bg-[#ccc]"
+                    className="border-t border-t-white h-full w-[150px] mr-1 justify-center items-center bg-[#ccc]"
                     style={{ minHeight: 60 }} // fallback minimum height
                   >
                     {/* This inner View takes 100% of the parent's height */}
@@ -2868,19 +2871,19 @@ export default function Home() {
                       <View className='flex-row bg-[#f0f0f0] sticky top-[0px] z-50 gap-[4px]'>
                         <Text className='text-center w-[120px] text-[12px] bg-black text-white py-[5px]' >Category</Text>
                         <Text className='text-center w-[150px] text-[12px] bg-black text-white py-[5px]' >Item Name</Text>
-                        <Text className='text-center w-[150px] text-[12px] bg-black text-white py-[5px]' >Variant Name</Text>
+                        <Text className='text-center w-[214px] text-[12px] bg-black text-white py-[5px]' >Variant Name</Text>
                         <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Sell. Price</Text>
                         <Text className='text-center w-[80px] text-[10px] bg-black text-white py-[5px]' >Measurement</Text>
                         <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >MRP</Text>
                         <Text className='text-center w-[70px] text-[12px] bg-black text-white py-[5px]' >Stock</Text>
                         <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Buy. Price</Text>
-                        {/* ... more header cells */}
+                        <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Buy. Limit</Text>
                       </View>
 
                       {/* Data Rows */}
                       <ScrollView nestedScrollEnabled={true} style={{ height: 'calc(100vh - 200px)' }} >
                         {sortedCategorySections.map((section) => (
-                          <View className="mb-[2px] flex-row">
+                          <View className="mb-[2px] flex-row" key={section?.categoryName}>
                             {/* Category Header */}
                             {section.categoryName !== 'Uncategorized' ? (
                               <View className="bg-wheat w-[120px] items-center justify-center mr-[4px]">
@@ -2934,7 +2937,8 @@ export default function Home() {
                                                 {groupedItem.variants?.length > 0 ? (
                                                   <View className='bg-[#e6f3ff]' >
                                                     {groupedItem.variants.map((variant) => (
-                                                      <View className="flex-row gap-[4px]">
+                                                      <View className="flex-row gap-[4px]" key={variant?.id}>
+                                                        <TouchableOpacity className='w-[60px] bg-primaryRed border border-[#ffffff] items-center justify-center' onPress={() => handleDeleteVariant(item, variant)}><Text className='text-center text-white' >Delete</Text></TouchableOpacity>
                                                         <EditableField
                                                           itemId={groupedItem.id}
                                                           variantId={variant.id}
@@ -2993,7 +2997,16 @@ export default function Home() {
                                                           keyboardType="numeric"
                                                           onSave={handleSaveField}
                                                         />
-                                                        <TouchableOpacity className='py-[5px] px-[10px] bg-primaryRed border border-[#ffffff]' onPress={() => handleDeleteVariant(groupedItem, variant)}><Text className='text-center text-white' >Delete</Text></TouchableOpacity>
+                                                        <EditableField
+                                                          itemId={groupedItem.id}
+                                                          variantId={variant.id}
+                                                          fieldName="buyingLimit"
+                                                          value={(variant?.buyingLimit || 0).toString() || ''}
+                                                          width={80}
+                                                          placeholder="Buy. Limit"
+                                                          keyboardType="numeric"
+                                                          onSave={handleSaveField}
+                                                        />
                                                       </View>
                                                     ))}
                                                     {addNewVariantSectionVisibleFor === groupedItem?.id && (
@@ -3161,7 +3174,8 @@ export default function Home() {
                                           {item.variants?.length > 0 ? (
                                             <View className="flex-1 bg-[#e6f3ff]">
                                               {item.variants.map((variant) => (
-                                                <View className="flex-row gap-[4px]">
+                                                <View className="flex-row gap-[4px]" key={variant?.id}>
+                                                  <TouchableOpacity className='w-[60px] bg-primaryRed border border-[#ffffff] items-center justify-center' onPress={() => handleDeleteVariant(item, variant)}><Text className='text-center text-white' >Delete</Text></TouchableOpacity>
                                                   <EditableField
                                                     itemId={item.id}
                                                     variantId={variant.id}
@@ -3220,7 +3234,16 @@ export default function Home() {
                                                     keyboardType="numeric"
                                                     onSave={handleSaveField}
                                                   />
-                                                  <TouchableOpacity className='py-[5px] px-[10px] bg-primaryRed border border-[#ffffff]' onPress={() => handleDeleteVariant(item, variant)}><Text className='text-center text-white' >Delete</Text></TouchableOpacity>
+                                                  <EditableField
+                                                    itemId={item.id}
+                                                    variantId={variant.id}
+                                                    fieldName="buyingLimit"
+                                                    value={(variant?.buyingLimit || 0).toString() || ''}
+                                                    width={80}
+                                                    placeholder="Buy. Limit"
+                                                    keyboardType="numeric"
+                                                    onSave={handleSaveField}
+                                                  />
                                                 </View>
                                               ))}
                                               {addNewVariantSectionVisibleFor === item?.id && (
