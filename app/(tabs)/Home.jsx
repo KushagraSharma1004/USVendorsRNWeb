@@ -67,7 +67,6 @@ export default function Home() {
   const [selectedStatusFilters, setSelectedStatusFilters] = useState(['Pending'])
   const [isSelectedOrderItemsListModalVisible, setIsSelectedOrderItemsListModalVisible] = useState(false)
   const [orderToShowItemsFor, setOrderToShowItemsFor] = useState([])
-  const [isOrderActionModalVisible, setIsOrderActionModalVisible] = useState(false)
   const [orderForAction, setOrderForAction] = useState([])
   const [isPrintingModalVisible, setIsPrintingModalVisible] = useState(false)
   const [vendorFullAddress, setVendorFullAddress] = useState('')
@@ -701,7 +700,7 @@ export default function Home() {
         variants: updatedVariants
       });
 
-      if(updatedVariants?.length === 0) {
+      if (updatedVariants?.length === 0) {
         await deleteDoc(itemRef)
       }
       // Refresh the data
@@ -787,14 +786,12 @@ export default function Home() {
     }
   };
 
-  const handleApproveOrder = async () => {
-    if (!window.confirm('Are you sure you want to approve this order?')) return
-    const order = orderForAction;
+  const handleApproveOrder = async (order) => {
+    if (!window.confirm(`Are you sure you want to approve this order?\n\nOrder Id: ${order?.id}\n\nTotal Amount: ₹${order?.totalAmount}`)) return
     setIsSalesLoaderVisible(true);
     const orderRef = doc(db, `customers/${order?.customerMobileNumber}/myOrders`, order?.id);
     try {
       await updateDoc(orderRef, { orderStatus: 'Approved', vendorComment: '' });
-      setIsOrderActionModalVisible(false)
       setOrderForAction([])
       setVendorOrders((prev) => prev.map(ord =>
         ord.id === order.id ? { ...ord, orderStatus: 'Approved' } : ord
@@ -808,9 +805,8 @@ export default function Home() {
     }
   };
 
-  const handleRejectOrder = async () => {
-    if (!window.confirm('Are you sure you want to Reject this order?')) return
-    const order = orderForAction;
+  const handleRejectOrder = async (order) => {
+    if (!window.confirm(`Are you sure you want to Reject this order?\n\nOrder Id: ${order?.id}\n\nTotal Amount: ₹${order?.totalAmount}`)) return
     setIsSalesLoaderVisible(true);
     const orderRef = doc(db, `customers/${order.customerMobileNumber}/myOrders`, order.id);
 
@@ -919,7 +915,6 @@ export default function Home() {
         ord.id === order.id ? { ...ord, orderStatus: 'Rejected' } : ord
       ));
 
-      setIsOrderActionModalVisible(false);
       setOrderForAction([]);
 
       alert("Order has been rejected, and the stock has been restored.");
@@ -1048,7 +1043,6 @@ export default function Home() {
 
       alert("Order updated successfully and stock adjusted!");
       setIsEditOrderModalVisible(false);
-      setIsOrderActionModalVisible(false);
       setOrderForAction([]);
 
       // Reset editing states
@@ -1249,49 +1243,6 @@ export default function Home() {
                 </ScrollView>
               </>
             )}
-
-            {/* <View className='p-[5px] w-full py-[5px] flex-row gap-[5px]' >
-              <TouchableOpacity onPress={() => setSelectedOrderStatus('Pending')} className='bg-primaryYellow items-center justify-center flex-1 pb-[2px] rounded-[5px]' >
-                {selectedOrderStatus === 'Pending' ? (
-                  <Text className='font-bold'>Pending</Text>
-                ) : (
-                  <>
-                    <Text className='bg-white px-[5px] absolute top-[-5px] rounded-[5px] text-[10px]' >Pending</Text>
-                    <Text className='font-bold mt-[8px] text-[20px]' >{vendorOrders?.filter((order) => order?.orderStatus === 'Pending')?.length || 0}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setSelectedOrderStatus('Approved')} className='bg-primaryGreen items-center justify-center flex-1 pb-[2px] rounded-[5px]' >
-                {selectedOrderStatus === 'Approved' ? (
-                  <Text className='font-bold'>Approved</Text>
-                ) : (
-                  <>
-                    <Text className='bg-white px-[5px] absolute top-[-5px] rounded-[5px] text-[10px]' >Approved</Text>
-                    <Text className='font-bold mt-[8px] text-[20px]' >{vendorOrders?.filter((order) => order?.orderStatus === 'Approved')?.length || 0}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setSelectedOrderStatus('Rejected')} className='bg-primaryRed items-center justify-center flex-1 pb-[2px] rounded-[5px]' >
-                {selectedOrderStatus === 'Rejected' ? (
-                  <Text className='font-bold text-white'>Rejected</Text>
-                ) : (
-                  <>
-                    <Text className='bg-white px-[5px] absolute top-[-5px] rounded-[5px] text-[10px]' >Rejected</Text>
-                    <Text className='font-bold mt-[8px] text-[20px] text-white' >{vendorOrders?.filter((order) => order?.orderStatus === 'Rejected')?.length || 0}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setSelectedOrderStatus('All')} className='bg-white items-center justify-center flex-1 pb-[2px] rounded-[5px]' >
-                {selectedOrderStatus === 'All' ? (
-                  <Text className='font-bold'>All</Text>
-                ) : (
-                  <>
-                    <Text className='bg-white px-[5px] absolute top-[-5px] rounded-[5px] text-[10px]' >All</Text>
-                    <Text className='font-bold mt-[8px] text-[20px]' >{vendorOrders?.length || 0}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View> */}
 
             <ScrollView nestedScrollEnabled={true} horizontal={true}>
               <View style={{ flex: 1 }}>
@@ -2765,9 +2716,23 @@ export default function Home() {
                         <Text className='text-center w-[165px] text-[12px] py-[5px]'>{order?.id}</Text>
                         {/* Order Status */}
                         {order?.orderStatus === 'Pending' ? (
-                          <TouchableOpacity onPress={() => { setIsOrderActionModalVisible(true); setOrderForAction(order) }} >
-                            <Text className={`text-center w-[130px] text-[12px] py-[5px] ${order?.orderStatus === 'Pending' ? orderForAction?.id === order?.id ? 'bg-[#ccc]' : 'bg-primaryYellow' : order?.orderStatus === 'Approved' ? 'bg-primaryGreen text-white' : 'bg-primaryRed text-white'}`}>{order?.orderStatus || 'Pending'}</Text>
-                          </TouchableOpacity>
+                          <View className='flex-row w-[130px]' >
+                            <TouchableOpacity onPress={() => {setOrderForAction(order); handleApproveOrder(order)}} className='flex-1 rounded-l-[5px] bg-primaryGreen items-center justify-center' ><Text className='text-center text-white text-[10px]' >Approve</Text></TouchableOpacity>
+                            <TouchableOpacity onPress={() => {setOrderForAction(order); handleRejectOrder(order)}} className='flex-1 bg-primaryRed items-center justify-center' ><Text className='text-center text-white text-[10px]' >Reject</Text></TouchableOpacity>
+                            <TouchableOpacity onPress={() => {
+                              setOrderForAction(order)
+                              setIsEditOrderModalVisible(true);
+                              // Initialize editing states with current values
+                              const initialQtys = {};
+                              const initialPrices = {};
+                              order.items?.forEach(item => {
+                                initialQtys[item.id] = Number(item?.quantity);
+                                initialPrices[item.id] = Number(item?.price?.[0]?.sellingPrice);
+                              });
+                              setNewQtysForEditingOrder(initialQtys);
+                              setNewSellingPricesForEditingOrder(initialPrices);
+                            }} className='flex-1 rounded-r-[5px] bg-primaryYellow items-center justify-center' ><Text className='text-center text-[10px]' >Edit</Text></TouchableOpacity>
+                          </View>
                         ) : (
                           <Text className={`text-center w-[130px] text-[12px] py-[5px] ${order?.orderStatus === 'Pending' ? 'bg-primaryYellow' : order?.orderStatus === 'Approved' ? 'bg-primaryGreen text-white' : 'bg-primaryRed text-white'}`}>{order?.orderStatus || 'Pending'}</Text>
                         )}
@@ -3868,44 +3833,13 @@ export default function Home() {
         </Modal>
       )}
 
-      {isOrderActionModalVisible && (
-        <Modal animationType={'slide'} transparent={true} visible={isOrderActionModalVisible}>
-          <View className='p-[10px] h-full w-full bg-[#00000060] items-center justify-center'>
-            <View className='h-fit w-[60%] rounded-[5px] bg-white p-[10px] max-w-[600px]'>
-              {isSalesLoaderVisible && (<Loader />)}
-              <Text className='text-[18px] text-primary font-bold text-center'>Action For Order</Text>
-              <TouchableOpacity onPress={() => { setIsOrderActionModalVisible(false); setOrderForAction([]) }} className='absolute top-[10px] right-[10px] z-50'>
-                <Image source={require('@/assets/images/crossImage.png')} style={{ height: 25, width: 25 }} />
-              </TouchableOpacity>
-              <View className='flex-1 items-center justify-center gap-[5px] mt-[10px]' >
-                <TouchableOpacity onPress={handleApproveOrder} className='w-full p-[10px] rounded-[5px] bg-primaryGreen' ><Text className='text-center text-white font-bold text-[18px]' >Approve</Text></TouchableOpacity>
-                <TouchableOpacity onPress={handleRejectOrder} className='w-full p-[10px] rounded-[5px] bg-primaryRed' ><Text className='text-center text-white font-bold text-[18px]' >Reject</Text></TouchableOpacity>
-                <TouchableOpacity onPress={() => {
-                  setIsOrderActionModalVisible(false);
-                  setIsEditOrderModalVisible(true);
-                  // Initialize editing states with current values
-                  const initialQtys = {};
-                  const initialPrices = {};
-                  orderForAction.items?.forEach(item => {
-                    initialQtys[item.id] = Number(item?.quantity);
-                    initialPrices[item.id] = Number(item?.price?.[0]?.sellingPrice);
-                  });
-                  setNewQtysForEditingOrder(initialQtys);
-                  setNewSellingPricesForEditingOrder(initialPrices);
-                }} className='w-full p-[10px] rounded-[5px] bg-primaryYellow' ><Text className='text-center font-bold text-[18px]' >Edit</Text></TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-
       {isEditOrderModalVisible && (
         <Modal animationType={'slide'} transparent={true} visible={isEditOrderModalVisible}>
           <View className='p-[10px] h-full w-full bg-[#00000060] items-center justify-center'>
             <View className='h-full w-full rounded-[5px] bg-white p-[10px] max-w-[600px]'>
               {isSalesLoaderVisible && (<Loader />)}
               <Text className='text-[24px] text-primary font-bold text-center'>Edit Order</Text>
-              <TouchableOpacity onPress={() => { setIsEditOrderModalVisible(false); setIsOrderActionModalVisible(true) }} className='absolute top-[10px] right-[10px] z-50'>
+              <TouchableOpacity onPress={() => { setIsEditOrderModalVisible(false); }} className='absolute top-[10px] right-[10px] z-50'>
                 <Image source={require('@/assets/images/crossImage.png')} style={{ height: 30, width: 30 }} />
               </TouchableOpacity>
               <View className='flex-1 items-center justify-center gap-[5px] mt-[10px]' >
