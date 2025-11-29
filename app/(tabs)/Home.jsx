@@ -2192,6 +2192,94 @@ export default function Home() {
 
                         return uniqueQRCodes.map((qrMessage, index) => {
                           const filter = `QR:${qrMessage}`;
+                          if (vendorOrders
+                            ?.filter((order) => {
+                              // Status filter
+                              const statusMatch = selectedStatusFilters.length > 0
+                                ? selectedStatusFilters.includes(order?.orderStatus || 'Pending')
+                                : true;
+
+                              // Time filter
+                              let timeMatch = true;
+                              if (selectedTimeFilter && selectedTimeFilter !== 'all') {
+                                const orderDate = order?.orderTime?.toDate?.() || new Date(order?.timestamp || 0);
+
+                                // Normalize orderDate to start of day for fair comparison
+                                const orderDay = new Date(orderDate);
+                                orderDay.setHours(0, 0, 0, 0);
+
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0); // Start of today
+
+                                switch (selectedTimeFilter) {
+                                  case 'today':
+                                    timeMatch = orderDay.getTime() === today.getTime();
+                                    break;
+
+                                  case 'yesterday': {
+                                    const yesterday = new Date(today);
+                                    yesterday.setDate(yesterday.getDate() - 1);
+                                    timeMatch = orderDay.getTime() === yesterday.getTime();
+                                    break;
+                                  }
+
+                                  case 'last7days': {
+                                    const sevenDaysAgo = new Date(today);
+                                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6); // 7 days total including today
+                                    timeMatch = orderDay >= sevenDaysAgo && orderDay <= today;
+                                    break;
+                                  }
+
+                                  case 'last15days': {
+                                    const fifteenDaysAgo = new Date(today);
+                                    fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 14); // 15 days total
+                                    timeMatch = orderDay >= fifteenDaysAgo && orderDay <= today;
+                                    break;
+                                  }
+
+                                  case 'last30days': {
+                                    const thirtyDaysAgo = new Date(today);
+                                    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29); // 30 days total
+                                    timeMatch = orderDay >= thirtyDaysAgo && orderDay <= today;
+                                    break;
+                                  }
+
+                                  case 'last90days': {
+                                    const ninetyDaysAgo = new Date(today);
+                                    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 89);
+                                    timeMatch = orderDay >= ninetyDaysAgo && orderDay <= today;
+                                    break;
+                                  }
+
+                                  case 'last365days': {
+                                    const oneYearAgo = new Date(today);
+                                    oneYearAgo.setDate(oneYearAgo.getDate() - 364); // 365 days total
+                                    timeMatch = orderDay >= oneYearAgo && orderDay <= today;
+                                    break;
+                                  }
+
+                                  case 'custom': {
+                                    if (customStartDate && customEndDate) {
+                                      const startOfRange = new Date(customStartDate);
+                                      startOfRange.setHours(0, 0, 0, 0);
+
+                                      const endOfRange = new Date(customEndDate);
+                                      endOfRange.setHours(23, 59, 59, 999);
+
+                                      timeMatch = orderDate >= startOfRange && orderDate <= endOfRange;
+                                    }
+                                    break;
+                                  }
+
+                                  default:
+                                    timeMatch = true;
+                                }
+                              }
+
+                              return statusMatch && timeMatch;
+                            })?.filter((order) => order?.QRCodeMessage === qrMessage)?.length === 0) {
+                            return []
+                          }
                           return (
                             <TouchableOpacity
                               key={index}
