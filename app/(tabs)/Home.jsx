@@ -786,7 +786,7 @@ export default function Home() {
 
       // Fallback download
       const link = document.createElement('a');
-      link.href = dataUrl;
+      // link.href = dataUrl;
       link.download = 'bill.png';
       link.click();
     }
@@ -1115,9 +1115,9 @@ export default function Home() {
         {/* Category */}
         <TouchableOpacity
           onPress={() => {
-            toggleSection(Section.CATEGORY);
+            toggleSection(Section.CATEGORIES);
           }}
-          className={`h-full w-[120px] border-[5px] rounded-[5px] ${isSectionActive(Section.CATEGORY) ? 'bg-wheat' : 'bg-white'
+          className={`h-full w-[120px] border-[5px] rounded-[5px] ${isSectionActive(Section.CATEGORIES) ? 'bg-wheat' : 'bg-white'
             } border-primary p-[10px] items-center justify-center`}
         >
           <Text className="font-bold text-primary text-[16px] text-center">Category</Text>
