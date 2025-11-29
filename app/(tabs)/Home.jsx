@@ -573,7 +573,8 @@ export default function Home() {
     width,
     placeholder,
     keyboardType = 'default',
-    onSave
+    onSave,
+    placeholderTextColor = '#ccc'
   }) => {
     const isEditing = editingField?.itemId === itemId &&
       editingField?.variantId === variantId &&
@@ -651,7 +652,7 @@ export default function Home() {
             keyboardType={keyboardType}
             className={`border border-blue-500 text-center text-black text-[12px] py-[5px] w-[${width}px]`}
             placeholder={placeholder}
-            placeholderTextColor="#ccc"
+            placeholderTextColor={placeholderTextColor}
             autoFocus
           />
           <View style={{ flexDirection: 'row', marginLeft: 4 }}>
@@ -3001,9 +3002,9 @@ export default function Home() {
                                                           itemId={groupedItem.id}
                                                           variantId={variant.id}
                                                           fieldName="buyingLimit"
-                                                          value={(variant?.buyingLimit || 0).toString() || ''}
+                                                          value={(variant?.buyingLimit || '').toString() || ''}
                                                           width={80}
-                                                          placeholder="Buy. Limit"
+                                                          placeholder="Enter Limit"
                                                           keyboardType="numeric"
                                                           onSave={handleSaveField}
                                                         />
@@ -3238,9 +3239,9 @@ export default function Home() {
                                                     itemId={item.id}
                                                     variantId={variant.id}
                                                     fieldName="buyingLimit"
-                                                    value={(variant?.buyingLimit || 0).toString() || ''}
+                                                    value={(variant?.buyingLimit || '').toString() || ''}
                                                     width={80}
-                                                    placeholder="Buy. Limit"
+                                                    placeholder="Enter Limit"
                                                     keyboardType="numeric"
                                                     onSave={handleSaveField}
                                                   />
