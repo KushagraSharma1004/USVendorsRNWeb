@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, Image, TextInput, Modal, FlatList } from 'react-native';
-import { collection, addDoc, arrayUnion, updateDoc, doc, getDocs } from 'firebase/firestore'
+import { collection, addDoc, arrayUnion, updateDoc, doc, getDocs, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useAuth } from '../context/AuthContext'
 import Loader from '../components/Loader'
@@ -17,7 +17,7 @@ export default function Home() {
     DELIVERYMODES: 'deliverymodes',
     DELIVERYCONDITIONS: 'deliveryconditions',
     MYOFFERS: 'myoffers',
-    CATEGORY: 'category',
+    CATEGORIES: 'categories',
     ARRANGEITEMS: 'arrangeitems',
     MYQRS: 'myqrs',
     MYBANNERS: 'mybanners',
@@ -72,6 +72,11 @@ export default function Home() {
   const [isPrintingModalVisible, setIsPrintingModalVisible] = useState(false)
   const [vendorFullAddress, setVendorFullAddress] = useState('')
   const billRef = useRef(null);
+  const [isEditOrderModalVisible, setIsEditOrderModalVisible] = useState(false)
+  // const [newVendorCommentForOrder, setNewVendorCommentForOrder] = useState('')
+  const [isSalesLoaderVisible, setIsSalesLoaderVisible] = useState(false)
+  const [newSellingPricesForEditingOrder, setNewSellingPricesForEditingOrder] = useState({})
+  const [newQtysForEditingOrder, setNewQtysForEditingOrder] = useState({})
 
   const fetchVendorItemsList = async () => {
     try {
@@ -192,13 +197,98 @@ export default function Home() {
   }
 
   useEffect(() => {
-    fetchVendorItemsList()
-    fetchVendorCategories()
     if (vendorMobileNumber) {
-      fetchVendorOrders();
+      fetchVendorCategories()
       fetchVendorAddress()
     }
   }, [vendorMobileNumber])
+
+  useEffect(() => {
+    if (!vendorMobileNumber) return;
+
+    const vendorItemsRef = collection(db, 'users', vendorMobileNumber, 'list');
+    const unsubscribe = onSnapshot(vendorItemsRef,
+      (snapshot) => {
+        const vendorItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setVendorItemsList(vendorItems);
+      },
+      (error) => {
+        console.error('Error fetching Items list:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [vendorMobileNumber]);
+
+  useEffect(() => {
+    if (!vendorMobileNumber) return;
+
+    const customersRef = collection(db, 'customers');
+    const unsubscribers = []; // To clean up all listeners
+
+    const unsubscribeCustomers = onSnapshot(
+      customersRef,
+      (customersSnapshot) => {
+        const allOrders = [];
+        const orderUnsubscribers = [];
+
+        // For each customer, set up a LIVE listener on their myOrders
+        customersSnapshot.docs.forEach((customerDoc) => {
+          const customerMobileNumber = customerDoc.id;
+          const ordersRef = collection(db, 'customers', customerMobileNumber, 'myOrders');
+
+          const unsubscribeOrders = onSnapshot(
+            ordersRef,
+            (ordersSnapshot) => {
+              // Clear previous orders from this customer
+              setVendorOrders((prev) => {
+                return prev.filter((order) => order.customerMobileNumber !== customerMobileNumber);
+              });
+
+              // Add only vendor's orders from this customer
+              const vendorOrdersFromCustomer = ordersSnapshot.docs
+                .map((doc) => ({
+                  id: doc.id,
+                  ...doc.data(),
+                  customerMobileNumber,
+                }))
+                .filter((order) => order.vendorMobileNumber === vendorMobileNumber);
+
+              // Append new ones
+              setVendorOrders((prev) => {
+                const updated = [...prev, ...vendorOrdersFromCustomer];
+                // Sort by latest first
+                return updated.sort((a, b) => {
+                  const timeA = a.orderTime?.toDate?.() || new Date(a.timestamp || 0);
+                  const timeB = b.orderTime?.toDate?.() || new Date(b.timestamp || 0);
+                  return timeB - timeA;
+                });
+              });
+            },
+            (error) => {
+              console.error(`Error listening to orders for ${customerMobileNumber}:`, error);
+            }
+          );
+
+          orderUnsubscribers.push(unsubscribeOrders);
+        });
+
+        // Clean up previous order listeners (important!)
+        unsubscribers.forEach((unsub) => unsub());
+        unsubscribers.length = 0;
+        unsubscribers.push(...orderUnsubscribers);
+      },
+      (error) => {
+        console.error('Error in customers listener:', error);
+      }
+    );
+
+    // Cleanup all listeners on unmount or vendor change
+    return () => {
+      unsubscribeCustomers();
+      unsubscribers.forEach((unsub) => unsub());
+    };
+  }, [vendorMobileNumber]);;
 
   const generateVariantId = (indexORName = 0) => {
     // Create a URL-safe variant ID without spaces or special characters
@@ -611,6 +701,9 @@ export default function Home() {
         variants: updatedVariants
       });
 
+      if(updatedVariants?.length === 0) {
+        await deleteDoc(itemRef)
+      }
       // Refresh the data
       await fetchVendorItemsList();
 
@@ -691,6 +784,282 @@ export default function Home() {
       link.href = dataUrl;
       link.download = 'bill.png';
       link.click();
+    }
+  };
+
+  const handleApproveOrder = async () => {
+    if (!window.confirm('Are you sure you want to approve this order?')) return
+    const order = orderForAction;
+    setIsSalesLoaderVisible(true);
+    const orderRef = doc(db, `customers/${order?.customerMobileNumber}/myOrders`, order?.id);
+    try {
+      await updateDoc(orderRef, { orderStatus: 'Approved', vendorComment: '' });
+      setIsOrderActionModalVisible(false)
+      setOrderForAction([])
+      setVendorOrders((prev) => prev.map(ord =>
+        ord.id === order.id ? { ...ord, orderStatus: 'Approved' } : ord
+      ));
+      alert("Order approved successfully!");
+    } catch (error) {
+      console.error("Error approving order:", error);
+      alert("Failed to approve order.");
+    } finally {
+      setIsSalesLoaderVisible(false);
+    }
+  };
+
+  const handleRejectOrder = async () => {
+    if (!window.confirm('Are you sure you want to Reject this order?')) return
+    const order = orderForAction;
+    setIsSalesLoaderVisible(true);
+    const orderRef = doc(db, `customers/${order.customerMobileNumber}/myOrders`, order.id);
+
+    try {
+      const orderSnap = await getDoc(orderRef);
+      if (!orderSnap.exists()) {
+        alert("Order not found.");
+        return;
+      }
+
+      const orderData = orderSnap.data();
+      const items = orderData.items || [];
+
+      // Group items by baseItemId (for variants) and itemId (for regular items)
+      const itemGroups = {};
+
+      items.forEach(item => {
+        const stockSubtracted = item.quantity || 0;
+
+        if (item.variantId && item.variantId !== '') {
+          // Variant item - group by baseItemId
+          const key = `variant_${item.baseItemId}`;
+          if (!itemGroups[key]) {
+            itemGroups[key] = {
+              type: 'variant',
+              baseItemId: item.baseItemId,
+              updates: []
+            };
+          }
+          itemGroups[key].updates.push({
+            variantId: item.variantId,
+            stockSubtracted,
+            itemName: item.name,
+            variantName: item.variantName
+          });
+        } else {
+          // Regular item - group by itemId
+          const key = `regular_${item.id}`;
+          if (!itemGroups[key]) {
+            itemGroups[key] = {
+              type: 'regular',
+              itemId: item.id,
+              stockSubtracted: 0
+            };
+          }
+          itemGroups[key].stockSubtracted += stockSubtracted;
+        }
+      });
+
+      const stockUpdatePromises = Object.values(itemGroups).map(async (group) => {
+        if (group.type === 'variant') {
+          const itemRef = doc(db, `users/${vendorMobileNumber}/list/${group.baseItemId}`);
+          const itemSnap = await getDoc(itemRef);
+
+          if (itemSnap.exists()) {
+            const itemData = itemSnap.data();
+            const variants = itemData.variants || [];
+            const updatedVariants = [...variants];
+
+            // Apply all variant updates for this base item
+            group.updates.forEach(update => {
+              const variantIndex = updatedVariants.findIndex(variant => variant.id === update.variantId);
+
+              if (variantIndex === -1) {
+                console.warn(`Variant ${update.variantId} not found for item ${update.itemName}`);
+                return;
+              }
+
+              const currentVariantStock = Number(updatedVariants[variantIndex].variantStock) || 0;
+              const updatedVariantStock = currentVariantStock + Number(update.stockSubtracted);
+
+              updatedVariants[variantIndex] = {
+                ...updatedVariants[variantIndex],
+                variantStock: updatedVariantStock
+              };
+            });
+
+            await updateDoc(itemRef, { variants: updatedVariants });
+          } else {
+            console.warn(`Base item ${group.baseItemId} not found for stock restoration.`);
+          }
+        } else {
+          // Regular item
+          const itemRef = doc(db, `users/${vendorMobileNumber}/list/${group.itemId}`);
+          const itemSnap = await getDoc(itemRef);
+
+          if (itemSnap.exists()) {
+            const itemData = itemSnap.data();
+            const currentStock = itemData.stock || 0;
+            const updatedStock = Number(currentStock) + Number(group.stockSubtracted);
+            await updateDoc(itemRef, { stock: Number(updatedStock) });
+          } else {
+            console.warn(`Item ${group.itemId} not found for stock restoration.`);
+          }
+        }
+      });
+
+      await Promise.all(stockUpdatePromises);
+      await updateDoc(orderRef, { orderStatus: 'Rejected' });
+
+      // Also update vendor's order copy
+      const vendorOrderRef = doc(db, `users/${vendorMobileNumber}/myOrders`, order.id);
+      await updateDoc(vendorOrderRef, { orderStatus: 'Rejected' });
+
+      setVendorOrders((prev) => prev.map(ord =>
+        ord.id === order.id ? { ...ord, orderStatus: 'Rejected' } : ord
+      ));
+
+      setIsOrderActionModalVisible(false);
+      setOrderForAction([]);
+
+      alert("Order has been rejected, and the stock has been restored.");
+    } catch (error) {
+      console.error("Error rejecting order or restoring stock:", error);
+      alert("Failed to reject order and restore stock.");
+    } finally {
+      setIsSalesLoaderVisible(false);
+    }
+  };
+
+  const handleSaveOrderChanges = async () => {
+    if (!orderForAction?.id) return;
+
+    setIsSalesLoaderVisible(true);
+
+    try {
+      const orderRef = doc(db, `customers/${orderForAction.customerMobileNumber}/myOrders`, orderForAction.id);
+
+      // Update items with new quantities and prices (handle empty strings)
+      const updatedItems = orderForAction.items.map(item => {
+        const newQty = newQtysForEditingOrder[item.id] !== undefined
+          ? (newQtysForEditingOrder[item.id] === '' ? 0 : Number(newQtysForEditingOrder[item.id]))
+          : Number(item.quantity);
+
+        const newSellingPrice = newSellingPricesForEditingOrder[item.id] !== undefined
+          ? (newSellingPricesForEditingOrder[item.id] === '' ? 0 : Number(newSellingPricesForEditingOrder[item.id]))
+          : Number(item?.price?.[0]?.sellingPrice);
+
+        return {
+          ...item,
+          quantity: newQty,
+          price: [{
+            ...item.price[0],
+            sellingPrice: newSellingPrice
+          }]
+        };
+      });
+
+      // Calculate new totals
+      const newSubTotal = updatedItems.reduce((total, item) => {
+        const sellingPrice = Number(item?.price?.[0]?.sellingPrice) || 0;
+        const quantity = Number(item.quantity) || 0;
+        return total + (sellingPrice * quantity);
+      }, 0);
+
+      const newTotalAmount = newSubTotal + Number(orderForAction.deliveryCharge || 0) - Number(orderForAction.totalDiscount || 0);
+
+      // Stock management: Update item stock based on quantity changes
+      const stockUpdatePromises = orderForAction.items.map(async (originalItem) => {
+        const updatedItem = updatedItems.find(item => item.id === originalItem.id);
+        if (!updatedItem) return;
+
+        const originalQty = Number(originalItem.quantity) || 0;
+        const newQty = Number(updatedItem.quantity) || 0;
+        const quantityDifference = newQty - originalQty;
+
+        // If quantity hasn't changed, no need to update stock
+        if (quantityDifference === 0) return;
+
+        try {
+          if (updatedItem.variantId && updatedItem.variantId !== '') {
+            // Handle variant item stock update
+            const itemRef = doc(db, `users/${vendorMobileNumber}/list/${updatedItem.baseItemId}`);
+            const itemSnap = await getDoc(itemRef);
+
+            if (itemSnap.exists()) {
+              const itemData = itemSnap.data();
+              const variants = itemData.variants || [];
+              const updatedVariants = variants.map(variant => {
+                if (variant.id === updatedItem.variantId) {
+                  const currentStock = Number(variant.variantStock) || 0;
+                  const updatedStock = currentStock - quantityDifference; // Subtract difference
+                  return {
+                    ...variant,
+                    variantStock: Math.max(0, updatedStock) // Ensure stock doesn't go negative
+                  };
+                }
+                return variant;
+              });
+
+              await updateDoc(itemRef, { variants: updatedVariants });
+            }
+          } else {
+            // Handle regular item stock update
+            const itemRef = doc(db, `users/${vendorMobileNumber}/list/${updatedItem.id}`);
+            const itemSnap = await getDoc(itemRef);
+
+            if (itemSnap.exists()) {
+              const itemData = itemSnap.data();
+              const currentStock = Number(itemData.stock) || 0;
+              const updatedStock = currentStock - quantityDifference; // Subtract difference
+              await updateDoc(itemRef, {
+                stock: Math.max(0, updatedStock) // Ensure stock doesn't go negative
+              });
+            }
+          }
+        } catch (error) {
+          console.error(`Error updating stock for item ${updatedItem.name}:`, error);
+          throw new Error(`Failed to update stock for ${updatedItem.name}`);
+        }
+      });
+
+      // Wait for all stock updates to complete
+      await Promise.all(stockUpdatePromises);
+
+      // Update Firestore order
+      await updateDoc(orderRef, {
+        items: updatedItems,
+        totalAmount: newTotalAmount
+      });
+
+      // Update local state
+      setVendorOrders(prev => prev.map(order =>
+        order.id === orderForAction.id
+          ? {
+            ...order,
+            items: updatedItems,
+            totalAmount: newTotalAmount
+          }
+          : order
+      ));
+
+      // Refresh vendor items list to reflect stock changes
+      await fetchVendorItemsList();
+
+      alert("Order updated successfully and stock adjusted!");
+      setIsEditOrderModalVisible(false);
+      setIsOrderActionModalVisible(false);
+      setOrderForAction([]);
+
+      // Reset editing states
+      setNewQtysForEditingOrder({});
+      setNewSellingPricesForEditingOrder({});
+
+    } catch (error) {
+      console.error("Error updating order:", error);
+      alert("Failed to update order. Please try again.");
+    } finally {
+      setIsSalesLoaderVisible(false);
     }
   };
 
@@ -807,6 +1176,7 @@ export default function Home() {
       <View className='flex-1'>
         {activeSection === 'sales' && (
           <View className='flex-1' >
+            {isSalesLoaderVisible && (<Loader />)}
             {Object.keys(ordersToSummarize).length > 0 && (
               <>
                 {/* Clear Selection Button - Smaller */}
@@ -3144,7 +3514,7 @@ export default function Home() {
           <Text className='p-[10px] text-center text-[24px]' >Comming Soon...</Text>
         )}
 
-        {activeSection === 'category' && (
+        {activeSection === 'categories' && (
           <Text className='p-[10px] text-center text-[24px]' >Comming Soon...</Text>
         )}
 
@@ -3501,11 +3871,164 @@ export default function Home() {
       {isOrderActionModalVisible && (
         <Modal animationType={'slide'} transparent={true} visible={isOrderActionModalVisible}>
           <View className='p-[10px] h-full w-full bg-[#00000060] items-center justify-center'>
-            <View className='h-full w-full rounded-[5px] bg-white p-[10px] max-w-[600px]'>
-              <Text className='text-[24px] text-primary font-bold text-center'>Action For Order</Text>
+            <View className='h-fit w-[60%] rounded-[5px] bg-white p-[10px] max-w-[600px]'>
+              {isSalesLoaderVisible && (<Loader />)}
+              <Text className='text-[18px] text-primary font-bold text-center'>Action For Order</Text>
               <TouchableOpacity onPress={() => { setIsOrderActionModalVisible(false); setOrderForAction([]) }} className='absolute top-[10px] right-[10px] z-50'>
+                <Image source={require('@/assets/images/crossImage.png')} style={{ height: 25, width: 25 }} />
+              </TouchableOpacity>
+              <View className='flex-1 items-center justify-center gap-[5px] mt-[10px]' >
+                <TouchableOpacity onPress={handleApproveOrder} className='w-full p-[10px] rounded-[5px] bg-primaryGreen' ><Text className='text-center text-white font-bold text-[18px]' >Approve</Text></TouchableOpacity>
+                <TouchableOpacity onPress={handleRejectOrder} className='w-full p-[10px] rounded-[5px] bg-primaryRed' ><Text className='text-center text-white font-bold text-[18px]' >Reject</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => {
+                  setIsOrderActionModalVisible(false);
+                  setIsEditOrderModalVisible(true);
+                  // Initialize editing states with current values
+                  const initialQtys = {};
+                  const initialPrices = {};
+                  orderForAction.items?.forEach(item => {
+                    initialQtys[item.id] = Number(item?.quantity);
+                    initialPrices[item.id] = Number(item?.price?.[0]?.sellingPrice);
+                  });
+                  setNewQtysForEditingOrder(initialQtys);
+                  setNewSellingPricesForEditingOrder(initialPrices);
+                }} className='w-full p-[10px] rounded-[5px] bg-primaryYellow' ><Text className='text-center font-bold text-[18px]' >Edit</Text></TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {isEditOrderModalVisible && (
+        <Modal animationType={'slide'} transparent={true} visible={isEditOrderModalVisible}>
+          <View className='p-[10px] h-full w-full bg-[#00000060] items-center justify-center'>
+            <View className='h-full w-full rounded-[5px] bg-white p-[10px] max-w-[600px]'>
+              {isSalesLoaderVisible && (<Loader />)}
+              <Text className='text-[24px] text-primary font-bold text-center'>Edit Order</Text>
+              <TouchableOpacity onPress={() => { setIsEditOrderModalVisible(false); setIsOrderActionModalVisible(true) }} className='absolute top-[10px] right-[10px] z-50'>
                 <Image source={require('@/assets/images/crossImage.png')} style={{ height: 30, width: 30 }} />
               </TouchableOpacity>
+              <View className='flex-1 items-center justify-center gap-[5px] mt-[10px]' >
+                {/* Header for items list */}
+                <View className="flex-row justify-between items-center p-[10px] bg-gray-100 border-b border-gray-300 mt-[10px] w-full">
+                  <View className='flex-1' >
+                    <Text className="flex-1">Total Qty:</Text>
+                    <Text className="flex-1">Sub Total:</Text>
+                    <Text className="flex-1">Delivery Charge:</Text>
+                    <Text className="flex-1">Offer:</Text>
+                    <Text className="font-bold flex-1">Grand Total:</Text>
+                  </View>
+
+                  <View className='items-end' >
+                    <Text className="flex-1">{orderForAction?.items?.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0)}</Text>
+                    <Text className="flex-1">₹{orderForAction?.items?.reduce((innerTotal, item) => innerTotal + Number(Number(item?.quantity || 0) * Number(item?.price?.[0]?.sellingPrice || 0)), 0)?.toFixed(2)}</Text>
+                    <Text className="flex-1">₹{Number(orderForAction?.deliveryCharge || 0)?.toFixed(2)}</Text>
+                    <Text className="flex-1">₹{Number(orderForAction?.totalDiscount || 0)?.toFixed(2)}</Text>
+                    <Text className="font-bold flex-1">₹{Number(orderForAction?.totalAmount || 0)?.toFixed(2)}</Text>
+                  </View>
+                </View>
+
+                <FlatList
+                  data={(() => {
+                    // Create an object to aggregate items by their unique properties
+                    const aggregatedItems = {};
+
+                    orderForAction.items?.forEach(item => {
+                      // Create a unique key based on all properties that should match
+                      const key = `${item.name}-${item.price?.[0]?.measurement}-${item.price?.[0]?.sellingPrice}-${item.variantName || ''}`;
+
+                      if (aggregatedItems[key]) {
+                        // If item already exists, increment quantity
+                        aggregatedItems[key].quantity += Number(item.quantity) || 0;
+                      } else {
+                        // If item doesn't exist, add it
+                        aggregatedItems[key] = {
+                          ...item,
+                          quantity: Number(item.quantity) || 0
+                        };
+                      }
+                    });
+
+                    return Object.values(aggregatedItems).sort((a, b) => a?.name?.localeCompare(b?.name));
+                  })()}
+                  className='w-full'
+                  keyExtractor={(item, index) => index.toString()}
+                  renderItem={({ item, index }) => (
+                    <View className='bg-white rounded-[5px] p-[10px] w-full flex-row h-[120px] border' >
+                      <Image style={{ height: 100, width: 100 }} className='rounded-[5px] shadow-md' resizeMode='stretch' source={item?.imageURL ? { uri: item?.imageURL } : require('@/assets/images/placeholderImage.png')} />
+                      <View className='h-full justify-between ml-[5px] flex-1' >
+                        <View className='flex-row justify-between items-center' >
+                          <Text>{item?.name}</Text>
+                          {item?.variantName && item?.variantName !== '' && <Text className='p-[2px] border border-primary rounded-[5px]' >{item?.variantName}</Text>}
+                        </View>
+                        <View className='flex-row justify-between items-center' >
+                          <Text>MRP: ₹{item?.price?.[0]?.mrp}</Text>
+                          <Text>QTY: <TextInput
+                            className='p-[5px] rounded-[5px] border border-[#ccc] w-[60px] text-center'
+                            placeholder='Qty'
+                            placeholderTextColor={'#ccc'}
+                            keyboardType='numeric'
+                            value={newQtysForEditingOrder[item.id] !== undefined ? newQtysForEditingOrder[item.id].toString() : item.quantity?.toString()}
+                            onChangeText={(text) => {
+                              // Allow empty string for complete deletion
+                              if (text === '') {
+                                setNewQtysForEditingOrder(prev => ({
+                                  ...prev,
+                                  [item.id]: ''
+                                }));
+                              } else {
+                                // Only convert to number if there's actual input
+                                const newQty = text === '' ? '' : Number(text);
+                                setNewQtysForEditingOrder(prev => ({
+                                  ...prev,
+                                  [item.id]: newQty
+                                }));
+                              }
+                            }}
+                          /></Text>
+                        </View>
+                        <View className='flex-row justify-between items-center' >
+                          <Text>₹<TextInput
+                            className='p-[5px] rounded-[5px] border border-[#ccc] w-[80px] text-center'
+                            placeholder='Price'
+                            placeholderTextColor={'#ccc'}
+                            keyboardType='numeric'
+                            value={newSellingPricesForEditingOrder[item.id] !== undefined ? newSellingPricesForEditingOrder[item.id].toString() : item?.price?.[0]?.sellingPrice?.toString()}
+                            onChangeText={(text) => {
+                              // Allow empty string for complete deletion
+                              if (text === '') {
+                                setNewSellingPricesForEditingOrder(prev => ({
+                                  ...prev,
+                                  [item.id]: ''
+                                }));
+                              } else {
+                                // Only convert to number if there's actual input
+                                const newPrice = text === '' ? '' : Number(text);
+                                setNewSellingPricesForEditingOrder(prev => ({
+                                  ...prev,
+                                  [item.id]: newPrice
+                                }));
+                              }
+                            }}
+                          />/{item?.price?.[0]?.measurement}</Text>
+                          <Text>Sub Total: ₹{Number(item?.price?.[0]?.sellingPrice) * Number(item?.quantity)}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                  ListEmptyComponent={
+                    <Text className="text-center text-gray-500 p-4">No items in selected orders</Text>
+                  }
+                />
+
+                {/* Save Changes Button */}
+                <TouchableOpacity
+                  onPress={handleSaveOrderChanges}
+                  className='p-[15px] bg-primaryGreen rounded-[5px] w-full mt-[10px]'
+                >
+                  <Text className='text-white text-center font-bold text-[18px]'>Save Changes</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </Modal>
@@ -3618,6 +4141,6 @@ export default function Home() {
           </View>
         </Modal>
       )}
-    </View >
+    </View>
   );
 }
