@@ -3013,7 +3013,7 @@ export default function Home() {
                                                     {addNewVariantSectionVisibleFor === groupedItem?.id && (
                                                       <View className="flex-row gap-[4px] h-[40px] items-center bg-white">
                                                         <TextInput
-                                                          className="border border-[#ccc] w-[150px] text-center text-black text-[12px] py-[5px]"
+                                                          className="border border-[#ccc] w-[150px] text-center text-black text-[12px] py-[5px] ml-[64]"
                                                           placeholder="Variant Name"
                                                           placeholderTextColor="#ccc"
                                                           value={newVariantName}
@@ -3094,7 +3094,7 @@ export default function Home() {
                                                     {addNewVariantSectionVisibleFor === groupedItem?.id && (
                                                       <View className="flex-row gap-[4px] h-[40px] items-center bg-white">
                                                         <TextInput
-                                                          className="border border-[#ccc] w-[150px] text-center text-black text-[12px] py-[5px]"
+                                                          className="border border-[#ccc] w-[150px] text-center text-black text-[12px] py-[5px] ml-[64]"
                                                           placeholder="Variant Name"
                                                           placeholderTextColor="#ccc"
                                                           value={newVariantName}
@@ -3250,7 +3250,7 @@ export default function Home() {
                                               {addNewVariantSectionVisibleFor === item?.id && (
                                                 <View className="flex-row gap-[4px] h-[40px] items-center bg-white">
                                                   <TextInput
-                                                    className="border border-[#ccc] w-[150px] text-center text-black text-[12px] py-[5px]"
+                                                    className="border border-[#ccc] w-[150px] text-center text-black text-[12px] py-[5px] ml-[64px]"
                                                     placeholder="Variant Name"
                                                     placeholderTextColor="#ccc"
                                                     value={newVariantName}
@@ -3331,7 +3331,7 @@ export default function Home() {
                                               {addNewVariantSectionVisibleFor === item?.id && (
                                                 <View className="flex-row gap-[4px] h-[40px] items-center bg-white">
                                                   <TextInput
-                                                    className="border border-[#ccc] w-[150px] text-center text-black text-[12px] py-[5px]"
+                                                    className="border border-[#ccc] w-[150px] text-center text-black text-[12px] py-[5px] ml-[64px]"
                                                     placeholder="Variant Name"
                                                     placeholderTextColor="#ccc"
                                                     value={newVariantName}
@@ -3417,7 +3417,7 @@ export default function Home() {
                                   />
 
                                   <TextInput
-                                    className="border border-[#ccc] w-[150px] text-center text-black text-[12px] py-[5px]"
+                                    className="border border-[#ccc] w-[150px] text-center text-black text-[12px] py-[5px] ml-[64]"
                                     placeholder="Variant Name"
                                     placeholderTextColor="#ccc"
                                     value={newVariantName}
