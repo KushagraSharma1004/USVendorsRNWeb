@@ -24,6 +24,7 @@ const Switch = ({
   inactiveText = 'OFF',
   textFontSize = 14,
   textColor = 'white',
+  thumbRadius = 'thumbSize / 2'
 }) => {
   const height = useSharedValue(0); // Actual height of the track (from onLayout)
   const width = useSharedValue(0);  // Actual width of the track (from onLayout)
@@ -78,7 +79,7 @@ const Switch = ({
       transform: [{ translateX: translateX }],
       width: thumbSize,        // Set the actual calculated width
       height: thumbSize,       // Set the actual calculated height
-      borderRadius: thumbSize / 2, // Make it perfectly circular
+      borderRadius: thumbRadius === 'thumbSize / 2' ? thumbSize / 2 : thumbRadius, // Make it perfectly circular
       backgroundColor: thumbColor,
     };
   });
@@ -178,7 +179,7 @@ const switchStyles = StyleSheet.create({
   },
 });
 
-export default function ToggleButton({activeText, inactiveText, textFontSize, textColor, onPress, value, onColor, offColor, thumbColor, switchStyle, className, duration} ) {
+export default function ToggleButton({activeText, inactiveText, textFontSize, textColor, onPress, value, onColor, offColor, thumbColor, switchStyle, className, duration, thumbRadius} ) {
   const isBusinessActive = useSharedValue(false); // Changed to a meaningful name
     const valueFromProp = value
   const handleToggle = () => {
@@ -199,6 +200,7 @@ export default function ToggleButton({activeText, inactiveText, textFontSize, te
         textFontSize={textFontSize} // Custom font size for text
         textColor={textColor} // Text color
         duration={duration}
+        thumbRadius={thumbRadius}
       />
     </View>
   );

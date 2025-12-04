@@ -4,6 +4,7 @@ import { collection, addDoc, arrayUnion, updateDoc, doc, getDocs, getDoc, onSnap
 import { db } from '@/firebase'
 import { useAuth } from '../context/AuthContext'
 import Loader from '../components/Loader'
+import ToggleButton from '../components/ToggleButton'
 import { Calendar, DateObject } from 'react-native-calendars';
 import { LocaleConfig } from 'react-native-calendars';
 import { toPng } from 'html-to-image';
@@ -574,7 +575,8 @@ export default function Home() {
     placeholder,
     keyboardType = 'default',
     onSave,
-    placeholderTextColor = '#ccc'
+    placeholderTextColor = '#ccc',
+    fontSize = 12
   }) => {
     const isEditing = editingField?.itemId === itemId &&
       editingField?.variantId === variantId &&
@@ -650,7 +652,7 @@ export default function Home() {
               : value || ''}
             onChangeText={handleChangeText}
             keyboardType={keyboardType}
-            className={`border border-blue-500 text-center text-black text-[12px] py-[5px] w-[${width}px]`}
+            className={`border border-blue-500 text-center text-black text-[${fontSize}px] py-[5px] w-[${width}px]`}
             placeholder={placeholder}
             placeholderTextColor={placeholderTextColor}
             autoFocus
@@ -1062,6 +1064,154 @@ export default function Home() {
       setIsSalesLoaderVisible(false);
     }
   };
+
+  const handleToggleVariantVisibility = async (variant, baseItemId) => {
+    if (!vendorMobileNumber) {
+      alert('Vendor not available. Please sign in again.');
+      return;
+    }
+
+    setIsBulkEditingLoaderVisible(true);
+    try {
+      const baseItemRef = doc(db, 'users', vendorMobileNumber, 'list', baseItemId);
+      const baseItemSnap = await getDoc(baseItemRef);
+
+      if (!baseItemSnap.exists()) {
+        alert('Error occurred: item not found. Try again later!');
+        return;
+      }
+
+      const baseItemData = baseItemSnap.data();
+      const oldVariants = baseItemData?.variants || [];
+
+      // toggle hidden flag for the matching variant
+      const updatedVariants = oldVariants.map(v =>
+        v.id === variant.id ? { ...v, hidden: !Boolean(v.hidden) } : v
+      );
+
+      const visibleVariants = updatedVariants?.filter(v => !v.hidden)?.length;
+
+      if (visibleVariants === 0) {
+        alert(`At least one variant must remain visible.\nHide "${baseItemData?.name}" if you want to hide it.`);
+        return
+      }
+
+      await updateDoc(baseItemRef, { variants: updatedVariants });
+
+      // refresh local list
+      await fetchVendorItemsList();
+
+      alert(`"${variant?.variantName}" ${variant.hidden ? 'is now visible' : 'has been hidden'} successfully!`);
+    } catch (error) {
+      console.error('Error toggling variant visibility:', error);
+      alert('Failed to update variant visibility. Please try again.');
+    } finally {
+      setIsBulkEditingLoaderVisible(false);
+    }
+  };
+
+  const handleToggleItemVisibility = async (item) => {
+
+    if (!vendorMobileNumber) {
+      alert('Vendor not available. Please sign in again.');
+      return;
+    }
+
+    setIsBulkEditingLoaderVisible(true);
+    try {
+      const baseItemRef = doc(db, 'users', vendorMobileNumber, 'list', item?.id);
+      const baseItemSnap = await getDoc(baseItemRef);
+
+      if (!baseItemSnap.exists()) {
+        alert('Error occurred: item not found. Try again later!');
+        return;
+      }
+
+      await updateDoc(baseItemRef, { hidden: Boolean(!item?.hidden) });
+
+      // refresh local list
+      await fetchVendorItemsList();
+
+      alert(`"${item?.name}" ${item.hidden ? 'is now visible' : 'has been hidden'} successfully!`);
+    } catch (error) {
+      console.error('Error toggling item visibility:', error);
+      alert('Failed to update item visibility. Please try again.');
+    } finally {
+      setIsBulkEditingLoaderVisible(false);
+    }
+  };
+
+  const handleToggleVariantAvailableFor = async (variant, baseItemId, mode) => {
+    if (!vendorMobileNumber) {
+      alert('Vendor not available. Please sign in again.');
+      return;
+    }
+
+    setIsBulkEditingLoaderVisible(true);
+
+    try {
+      const baseItemRef = doc(db, 'users', vendorMobileNumber, 'list', baseItemId);
+      const baseItemSnap = await getDoc(baseItemRef);
+
+      if (!baseItemSnap.exists()) {
+        alert('Error occurred: item not found. Try again later!');
+        return;
+      }
+
+      const baseItemData = baseItemSnap.data();
+      const oldVariants = baseItemData?.variants || [];
+
+      const currentVariant = oldVariants.find(v => v.id === variant.id);
+
+      if (!currentVariant) {
+        alert('Error occurred: Variant not found.');
+        return;
+      }
+
+      const oldTakeaway = currentVariant?.availableFor?.takeaway === undefined || currentVariant?.availableFor?.takeaway === null
+        ? true // If undefined/null, treat as ON (True)
+        : Boolean(currentVariant?.availableFor?.takeaway);
+
+      const oldSelfDelivery = currentVariant?.availableFor?.selfDelivery === undefined || currentVariant?.availableFor?.selfDelivery === null
+        ? true // If undefined/null, treat as ON (True)
+        : Boolean(currentVariant?.availableFor?.selfDelivery);
+
+      // Determine new values
+      const newTakeaway = mode === 'takeaway' ? !oldTakeaway : oldTakeaway;
+      const newSelfDelivery = mode === 'selfDelivery' ? !oldSelfDelivery : oldSelfDelivery;
+
+      // ❗ RULE: At least one must remain ON
+      if (!newTakeaway && !newSelfDelivery) {
+        alert('At least one option (Takeaway or Self Delivery) must remain enabled.');
+        return; // do not update
+      }
+
+      // Apply update in variants array
+      const updatedVariants = oldVariants.map(v =>
+        v.id === variant.id
+          ? {
+            ...v,
+            availableFor: {
+              takeaway: newTakeaway,
+              selfDelivery: newSelfDelivery,
+            },
+          }
+          : v
+      );
+
+      await updateDoc(baseItemRef, { variants: updatedVariants });
+
+      await fetchVendorItemsList();
+
+      alert('Variant availability updated successfully!');
+    } catch (error) {
+      console.error('Error toggling variant availability:', error);
+      alert('Failed to update variant availability. Please try again.');
+    } finally {
+      setIsBulkEditingLoaderVisible(false);
+    }
+  };
+
 
   return (
     <View>
@@ -2942,13 +3092,22 @@ export default function Home() {
                     </View>
 
                     {/* Button always sticks to the bottom */}
-                    <TouchableOpacity
-                      onPress={() => { setAddNewVariantSectionVisibleFor(item?.id); setAddNewItemSectionVisibleFor(null) }}
-                      className="mb-2 bg-primary rounded-[5px] px-3 py-1.5"
-                      activeOpacity={0.7}
-                    >
-                      <Text className="text-white font-bold text-xs">Add New Variant +</Text>
-                    </TouchableOpacity>
+                    <View className='flex-row w-full px-[5px] justify-between items-center mb-[5px]' >
+                      <ToggleButton
+                        value={!item?.hidden}
+                        activeText={'ON'}
+                        inactiveText={'OFF'}
+                        onPress={() => handleToggleItemVisibility(item)}
+                        switchStyle={{ width: 60, height: 25 }}
+                      />
+                      <TouchableOpacity
+                        onPress={() => { setAddNewVariantSectionVisibleFor(item?.id); setAddNewItemSectionVisibleFor(null) }}
+                        className="bg-primary rounded-[5px] p-[5px]"
+                        activeOpacity={0.7}
+                      >
+                        <Text className="text-white font-bold text-xs">Variant +</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 );
                 return (
@@ -2961,13 +3120,15 @@ export default function Home() {
                       <View className='flex-row bg-[#f0f0f0] sticky top-[0px] z-50 gap-[4px]'>
                         <Text className='text-center w-[120px] text-[12px] bg-black text-white py-[5px]' >Category</Text>
                         <Text className='text-center w-[150px] text-[12px] bg-black text-white py-[5px]' >Item Name</Text>
-                        <Text className='text-center w-[214px] text-[12px] bg-black text-white py-[5px]' >Variant Name</Text>
-                        <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Sell. Price</Text>
+                        <Text className='text-center w-[268px] text-[12px] bg-black text-white py-[5px]' >Variant Name</Text>
+                        <Text className='text-center w-[70px] text-[12px] bg-black text-white py-[5px]' >Sell. Price</Text>
                         <Text className='text-center w-[80px] text-[10px] bg-black text-white py-[5px]' >Measurement</Text>
-                        <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >MRP</Text>
+                        <Text className='text-center w-[70px] text-[12px] bg-black text-white py-[5px]' >MRP</Text>
                         <Text className='text-center w-[70px] text-[12px] bg-black text-white py-[5px]' >Stock</Text>
-                        <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Buy. Price</Text>
-                        <Text className='text-center w-[80px] text-[12px] bg-black text-white py-[5px]' >Buy. Limit</Text>
+                        <Text className='text-center w-[70px] text-[12px] bg-black text-white py-[5px]' >Buy. Price</Text>
+                        <Text className='text-center w-[70px] text-[12px] bg-black text-white py-[5px]' >Buy. Limit</Text>
+                        <Text className='text-center w-[60px] text-[12px] bg-black text-white py-[5px]' >Takeaway</Text>
+                        <Text className='text-center w-[60px] text-[12px] bg-black text-white py-[5px]' >Delivery</Text>
                       </View>
 
                       {/* Data Rows */}
@@ -3028,6 +3189,17 @@ export default function Home() {
                                                   <View className='bg-[#e6f3ff]' >
                                                     {groupedItem.variants.map((variant) => (
                                                       <View className="flex-row gap-[4px]" key={variant?.id}>
+                                                        <ToggleButton
+                                                          value={!variant?.hidden}
+                                                          activeText={'ON'}
+                                                          inactiveText={'OFF'}
+                                                          onPress={() => handleToggleVariantVisibility(variant, groupedItem?.id)}
+                                                          offColor={'#ccc'}
+                                                          onColor={'black'}
+                                                          switchStyle={{ width: 50, height: 20, borderRadius: 0, padding: 4 }}
+                                                          thumbRadius={0}
+                                                          textFontSize={12}
+                                                        />
                                                         <TouchableOpacity className='w-[60px] bg-primaryRed border border-[#ffffff] items-center justify-center' onPress={() => handleDeleteVariant(groupedItem, variant)}><Text className='text-center text-white' >Delete</Text></TouchableOpacity>
                                                         <EditableField
                                                           itemId={groupedItem.id}
@@ -3043,7 +3215,7 @@ export default function Home() {
                                                           variantId={variant.id}
                                                           fieldName="sellingPrice"
                                                           value={variant?.prices?.[0]?.variantSellingPrice?.toString() || ''}
-                                                          width={80}
+                                                          width={70}
                                                           placeholder="SP"
                                                           keyboardType="numeric"
                                                           onSave={handleSaveField}
@@ -3062,7 +3234,7 @@ export default function Home() {
                                                           variantId={variant.id}
                                                           fieldName="mrp"
                                                           value={variant?.prices?.[0]?.variantMrp?.toString() || ''}
-                                                          width={80}
+                                                          width={70}
                                                           placeholder="MRP"
                                                           keyboardType="numeric"
                                                           onSave={handleSaveField}
@@ -3082,7 +3254,7 @@ export default function Home() {
                                                           variantId={variant.id}
                                                           fieldName="buyingPrice"
                                                           value={variant?.prices?.[0]?.variantPrice?.toString() || ''}
-                                                          width={80}
+                                                          width={70}
                                                           placeholder="BP"
                                                           keyboardType="numeric"
                                                           onSave={handleSaveField}
@@ -3092,10 +3264,28 @@ export default function Home() {
                                                           variantId={variant.id}
                                                           fieldName="buyingLimit"
                                                           value={(variant?.buyingLimit || '').toString() || ''}
-                                                          width={80}
+                                                          width={70}
+                                                          fontSize={10}
                                                           placeholder="Enter Limit"
                                                           keyboardType="numeric"
                                                           onSave={handleSaveField}
+                                                        />
+                                                        <ToggleButton
+                                                          value={variant?.availableFor?.takeaway === undefined || variant?.availableFor?.takeaway === null ? true : Boolean(variant?.availableFor?.takeaway)}
+                                                          activeText={'ON'}
+                                                          inactiveText={'OFF'}
+                                                          textFontSize={12}
+                                                          onPress={() => handleToggleVariantAvailableFor(variant, groupedItem?.id, 'takeaway')}
+                                                          switchStyle={{ width: 60, height: 20, borderRadius: 0 }}
+                                                        />
+
+                                                        <ToggleButton
+                                                          value={variant?.availableFor?.selfDelivery === undefined || variant?.availableFor?.selfDelivery === null ? true : Boolean(variant?.availableFor?.selfDelivery)}
+                                                          activeText={'ON'}
+                                                          inactiveText={'OFF'}
+                                                          textFontSize={12}
+                                                          onPress={() => handleToggleVariantAvailableFor(variant, groupedItem?.id, 'selfDelivery')}
+                                                          switchStyle={{ width: 60, height: 20, borderRadius: 0 }}
                                                         />
                                                       </View>
                                                     ))}
@@ -3265,6 +3455,17 @@ export default function Home() {
                                             <View className="flex-1 bg-[#e6f3ff]">
                                               {item.variants.map((variant) => (
                                                 <View className="flex-row gap-[4px]" key={variant?.id}>
+                                                  <ToggleButton
+                                                    value={!variant?.hidden}
+                                                    offColor={'#ccc'}
+                                                    onColor={'black'}
+                                                    activeText={'ON'}
+                                                    inactiveText={'OFF'}
+                                                    onPress={() => handleToggleVariantVisibility(variant, item?.id)}
+                                                    switchStyle={{ width: 50, height: 20, borderRadius: 0, padding: 4 }}
+                                                    thumbRadius={0}
+                                                    textFontSize={12}
+                                                  />
                                                   <TouchableOpacity className='w-[60px] bg-primaryRed border border-[#ffffff] items-center justify-center' onPress={() => handleDeleteVariant(item, variant)}><Text className='text-center text-white' >Delete</Text></TouchableOpacity>
                                                   <EditableField
                                                     itemId={item.id}
@@ -3280,7 +3481,7 @@ export default function Home() {
                                                     variantId={variant.id}
                                                     fieldName="sellingPrice"
                                                     value={variant?.prices?.[0]?.variantSellingPrice?.toString() || ''}
-                                                    width={80}
+                                                    width={70}
                                                     placeholder="SP"
                                                     keyboardType="numeric"
                                                     onSave={handleSaveField}
@@ -3299,7 +3500,7 @@ export default function Home() {
                                                     variantId={variant.id}
                                                     fieldName="mrp"
                                                     value={variant?.prices?.[0]?.variantMrp?.toString() || ''}
-                                                    width={80}
+                                                    width={70}
                                                     placeholder="MRP"
                                                     keyboardType="numeric"
                                                     onSave={handleSaveField}
@@ -3319,7 +3520,7 @@ export default function Home() {
                                                     variantId={variant.id}
                                                     fieldName="buyingPrice"
                                                     value={variant?.prices?.[0]?.variantPrice?.toString() || ''}
-                                                    width={80}
+                                                    width={70}
                                                     placeholder="BP"
                                                     keyboardType="numeric"
                                                     onSave={handleSaveField}
@@ -3329,10 +3530,28 @@ export default function Home() {
                                                     variantId={variant.id}
                                                     fieldName="buyingLimit"
                                                     value={(variant?.buyingLimit || '').toString() || ''}
-                                                    width={80}
+                                                    width={70}
+                                                    fontSize={10}
                                                     placeholder="Enter Limit"
                                                     keyboardType="numeric"
                                                     onSave={handleSaveField}
+                                                  />
+                                                  <ToggleButton
+                                                    value={variant?.availableFor?.takeaway === undefined || variant?.availableFor?.takeaway === null ? true : Boolean(variant?.availableFor?.takeaway)}
+                                                    activeText={'ON'}
+                                                    inactiveText={'OFF'}
+                                                    textFontSize={12}
+                                                    onPress={() => handleToggleVariantAvailableFor(variant, item?.id, 'takeaway')}
+                                                    switchStyle={{ width: 60, height: 20, borderRadius: 0 }}
+                                                  />
+
+                                                  <ToggleButton
+                                                    value={variant?.availableFor?.selfDelivery === undefined || variant?.availableFor?.selfDelivery === null ? true : Boolean(variant?.availableFor?.selfDelivery)}
+                                                    activeText={'ON'}
+                                                    inactiveText={'OFF'}
+                                                    textFontSize={12}
+                                                    onPress={() => handleToggleVariantAvailableFor(variant, item?.id, 'selfDelivery')}
+                                                    switchStyle={{ width: 60, height: 20, borderRadius: 0 }}
                                                   />
                                                 </View>
                                               ))}
