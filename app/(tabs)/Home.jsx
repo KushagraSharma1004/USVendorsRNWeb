@@ -513,6 +513,9 @@ export default function Home() {
               case 'buyingLimit':
                 updatedVariant.buyingLimit = Number(newValue);
                 break;
+              case 'UNOCoinsLimit':
+                updatedVariant.UNOCoinsLimit = Number(newValue);
+                break;
               default:
                 console.warn('Unknown field:', fieldName);
             }
@@ -3129,6 +3132,7 @@ export default function Home() {
                         <Text className='text-center w-[70px] text-[12px] bg-black text-white py-[5px]' >Buy. Limit</Text>
                         <Text className='text-center w-[60px] text-[12px] bg-black text-white py-[5px]' >Takeaway</Text>
                         <Text className='text-center w-[60px] text-[12px] bg-black text-white py-[5px]' >Delivery</Text>
+                        <Text className='text-center w-[70px] text-[12px] bg-black text-white py-[5px]' >Coins Usage</Text>
                       </View>
 
                       {/* Data Rows */}
@@ -3278,7 +3282,6 @@ export default function Home() {
                                                           onPress={() => handleToggleVariantAvailableFor(variant, groupedItem?.id, 'takeaway')}
                                                           switchStyle={{ width: 60, height: 20, borderRadius: 0 }}
                                                         />
-
                                                         <ToggleButton
                                                           value={variant?.availableFor?.selfDelivery === undefined || variant?.availableFor?.selfDelivery === null ? true : Boolean(variant?.availableFor?.selfDelivery)}
                                                           activeText={'ON'}
@@ -3286,6 +3289,17 @@ export default function Home() {
                                                           textFontSize={12}
                                                           onPress={() => handleToggleVariantAvailableFor(variant, groupedItem?.id, 'selfDelivery')}
                                                           switchStyle={{ width: 60, height: 20, borderRadius: 0 }}
+                                                        />
+                                                        <EditableField
+                                                          itemId={groupedItem.id}
+                                                          variantId={variant.id}
+                                                          fieldName="UNOCoinsLimit"
+                                                          value={(variant?.UNOCoinsLimit || '').toString() || ''}
+                                                          width={70}
+                                                          fontSize={10}
+                                                          placeholder="Enter Limit"
+                                                          keyboardType="numeric"
+                                                          onSave={handleSaveField}
                                                         />
                                                       </View>
                                                     ))}
@@ -3544,7 +3558,6 @@ export default function Home() {
                                                     onPress={() => handleToggleVariantAvailableFor(variant, item?.id, 'takeaway')}
                                                     switchStyle={{ width: 60, height: 20, borderRadius: 0 }}
                                                   />
-
                                                   <ToggleButton
                                                     value={variant?.availableFor?.selfDelivery === undefined || variant?.availableFor?.selfDelivery === null ? true : Boolean(variant?.availableFor?.selfDelivery)}
                                                     activeText={'ON'}
@@ -3552,6 +3565,17 @@ export default function Home() {
                                                     textFontSize={12}
                                                     onPress={() => handleToggleVariantAvailableFor(variant, item?.id, 'selfDelivery')}
                                                     switchStyle={{ width: 60, height: 20, borderRadius: 0 }}
+                                                  />
+                                                  <EditableField
+                                                    itemId={item.id}
+                                                    variantId={variant.id}
+                                                    fieldName="UNOCoinsLimit"
+                                                    value={(variant?.UNOCoinsLimit || '').toString() || ''}
+                                                    width={70}
+                                                    fontSize={10}
+                                                    placeholder="Enter Limit"
+                                                    keyboardType="numeric"
+                                                    onSave={handleSaveField}
                                                   />
                                                 </View>
                                               ))}
